@@ -312,19 +312,25 @@ function StepCategory() {
               <Plus className="w-4 h-4" /> Add Room
             </button>
           </div>
-          {rooms.map((room, idx) => (
-            <div key={idx} className="bg-white dark:bg-d-card p-5 rounded-2xl border border-ink/[0.08] dark:border-white/[0.08] flex items-center gap-4 flex-wrap shadow-sm">
-              <span className="font-bold text-ink/50 dark:text-white/50 text-sm w-20">Room {idx + 1}</span>
-              <Counter label="Adults" value={room.adults} onChange={v => updateRoom(idx, 'adults', v)} min={1} />
-              <Counter label="Youth" value={room.youth} onChange={v => updateRoom(idx, 'youth', v)} />
-              <Counter label="Children" value={room.children} onChange={v => updateRoom(idx, 'children', v)} />
-              {rooms.length > 1 && (
-                <button onClick={() => removeRoom(idx)} className="text-danger hover:bg-danger/10 p-2 rounded-xl cursor-pointer transition-colors">
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-4">
+            {rooms.map((room, idx) => (
+              <div key={idx} className="bg-white dark:bg-d-card p-5 rounded-2xl border border-ink/[0.08] dark:border-white/[0.08] flex flex-col gap-4 shadow-sm relative group transition-all hover:border-brand/30 hover:shadow-md">
+                <div className="flex items-center justify-between pb-3 border-b border-ink/[0.04] dark:border-white/[0.04]">
+                  <span className="font-extrabold text-ink dark:text-white text-base">Room {idx + 1}</span>
+                  {rooms.length > 1 && (
+                    <button onClick={() => removeRoom(idx)} className="text-danger bg-danger/5 hover:bg-danger transition-colors hover:text-white p-1.5 rounded-lg cursor-pointer" title="Remove Room">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center justify-between gap-1 sm:gap-4">
+                  <Counter label="Adults" value={room.adults} onChange={v => updateRoom(idx, 'adults', v)} min={1} />
+                  <Counter label="Youth" value={room.youth} onChange={v => updateRoom(idx, 'youth', v)} />
+                  <Counter label="Children" value={room.children} onChange={v => updateRoom(idx, 'children', v)} />
+                </div>
+              </div>
+            ))}
+          </div>
         </motion.div>
       )}
 

@@ -56,8 +56,16 @@ export default function ItineraryStep() {
 
       <RouteMap />
 
-      {/* Timeline */}
+      {/* Timeline Container */}
       <div ref={containerRef} className="relative mt-8 md:mt-12 max-w-6xl md:mx-auto px-4 lg:px-0">
+
+        {/* Sticky Container for Vehicle */}
+        <div className="absolute left-[27px] md:left-[220px] top-4 bottom-0 w-0 z-20 pointer-events-none">
+          <div className="sticky top-1/2 -mt-6 -translate-x-1/2 flex items-center justify-center w-12 h-12 bg-white dark:bg-d-card rounded-full shadow-[0_0_20px_rgba(79,70,229,0.4)] border-4 border-white dark:border-d-card ring-2 ring-brand/20 text-2xl transition-transform duration-300">
+            {vehicleCategory === 'Car Rental' ? '🚘' : vehicleCategory === 'Flight' ? '✈️' : '🚂'}
+          </div>
+        </div>
+
         {/* Vertical dotted line background */}
         <div className="absolute left-[27px] md:left-[220px] top-8 bottom-0 w-0 border-l-[2px] border-dashed border-ink/15 dark:border-white/15" />
 
@@ -74,6 +82,9 @@ export default function ItineraryStep() {
           const isTransit = nextDay && nextDay.cityId !== day.cityId;
           const dist = isTransit ? getDistance(day.cityId, nextDay.cityId) : null;
 
+          const vType = vehicleCategory || 'Train';
+          const IconComponent = vType === 'Car Rental' ? Car : vType === 'Flight' ? Plane : Train;
+
           return (
             <motion.div key={day.dayNum}
               initial={{ opacity: 0, y: 30 }}
@@ -82,17 +93,13 @@ export default function ItineraryStep() {
               transition={{ delay: 0.05 * dIdx }}
               className="relative md:flex pb-10 group">
 
-              {/* Timeline dot */}
-              <motion.div
-                initial={{ scale: 0, opacity: 0 }}
-                whileInView={{ scale: 1, opacity: 1 }}
-                viewport={{ once: true, margin: "-100px" }}
-                transition={{ type: "spring", stiffness: 400, damping: 15, delay: 0.1 }}
-                className="absolute left-[27px] md:left-[220px] top-8 md:top-6 w-4 h-4 -translate-x-[7px] rounded-full bg-brand shadow-[0_0_15px_rgba(79,70,229,0.6)] border-[3px] border-white dark:border-d-card z-10 transition-transform duration-300 group-hover:scale-150"
-              />
-
               {/* Left Column (Day Info) */}
-              <div className="pl-14 md:pl-0 md:w-[220px] md:pr-10 pt-6 md:pt-4 shrink-0 md:text-right mb-4 md:mb-0">
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: false, margin: "-100px" }}
+                transition={{ type: "spring", stiffness: 400, damping: 15, delay: 0.1 }}
+                className="pl-14 md:pl-0 md:w-[220px] md:pr-10 pt-6 md:pt-4 shrink-0 md:text-right mb-4 md:mb-0">
                 <h4 className="font-extrabold text-2xl lg:text-3xl text-ink dark:text-white tracking-tight mb-1 transition-colors">
                   Day {String(day.dayNum).padStart(2, '0')}
                 </h4>
@@ -102,13 +109,13 @@ export default function ItineraryStep() {
                     <span className="px-3 py-1 rounded-full bg-brand/10 text-brand text-xs font-bold inline-block">Departure Day</span>
                   </div>
                 )}
-              </div>
+              </motion.div>
 
               {/* Right Column (Content) */}
               <div className="pl-14 md:pl-10 flex-1 md:pt-3">
                 {/* City transition header */}
                 {isNewCity && city && (
-                  <motion.div initial={{ x: -20, opacity: 0 }} whileInView={{ x: 0, opacity: 1 }} viewport={{ once: true }} className="mb-6 flex items-center gap-4 bg-white/60 dark:bg-d-card/60 backdrop-blur-md p-4 rounded-2xl shadow-sm border border-white/50 dark:border-white/[0.08] w-fit">
+                  <motion.div initial={{ x: -20, opacity: 0 }} whileInView={{ x: 0, opacity: 1 }} viewport={{ once: false }} className="mb-6 flex items-center gap-4 bg-white/60 dark:bg-d-card/60 backdrop-blur-md p-4 rounded-2xl shadow-sm border border-white/50 dark:border-white/[0.08] w-fit">
                     <div className="w-14 h-14 rounded-xl bg-white dark:bg-d-card shadow-sm overflow-hidden shrink-0 border border-ink/[0.08] dark:border-white/[0.08]">
                       <img src={city.image} className="w-full h-full object-cover scale-110" alt={city.name} />
                     </div>
@@ -152,7 +159,7 @@ export default function ItineraryStep() {
       </div>
 
       {/* Consent Section */}
-      <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+      <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: false }}
         className="mt-12 bg-white dark:bg-d-card rounded-3xl border border-gray-200 dark:border-white/[0.08] p-8 shadow-lg">
         <h3 className="font-extrabold text-xl text-ink dark:text-white mb-4">Confirm Your Plan</h3>
         <label className="flex items-start gap-3 cursor-pointer mb-6" onClick={() => setConsent(!consentGiven)}>
