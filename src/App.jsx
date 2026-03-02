@@ -4,7 +4,8 @@ import { Toaster } from 'react-hot-toast';
 
 import LandingPage from './pages/LandingPage';
 import PlannerPage from './pages/PlannerPage';
-import AdminDashboard from './pages/AdminDashboard';
+import AdminLayout from './pages/admin/AdminLayout';
+import AgentLayout from './pages/agent/AgentLayout';
 import HistoryPage from './pages/HistoryPage';
 import AuthPage from './pages/AuthPage';
 import NotFound from './pages/NotFound';
@@ -23,7 +24,8 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/planner/*" element={<PlannerPage />} />
-        <Route path="/admin/*" element={<AdminDashboard />} />
+        <Route path="/admin/*" element={<AdminLayout />} />
+        <Route path="/agent/*" element={<AgentLayout />} />
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="*" element={<NotFound />} />

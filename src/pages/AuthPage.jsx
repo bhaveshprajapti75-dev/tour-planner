@@ -1,28 +1,50 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, Phone, Lock, Building2, ArrowRight, ShieldCheck, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import usePlannerStore from '../store/plannerStore';
+import { User, Mail, Phone, Lock, Building2, ArrowRight, ShieldCheck, X, Loader2 } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import useAuthStore from '../store/authStore';
 import Navbar from '../components/layout/Navbar';
+import toast from 'react-hot-toast';
 
 export default function AuthPage() {
   const navigate = useNavigate();
-  const login = usePlannerStore(s => s.login);
+  const [searchParams] = useSearchParams();
+  const { login, register, loading, isAdmin } = useAuthStore();
   const [mode, setMode] = useState('login'); // login | b2c | agent
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', agencyName: '', gst: '', address: '' });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const user = {
-      id: `user_${Date.now()}`,
-      name: form.name || form.email.split('@')[0],
-      email: form.email,
-      role: mode === 'agent' ? 'agent' : 'b2c',
-      phone: form.phone,
-      ...(mode === 'agent' && { agencyName: form.agencyName, gst: form.gst, address: form.address }),
-    };
-    login(user);
-    navigate('/planner/wizard');
+    
+    if (mode === 'login') {
+      const result = await login(form.email, form.password);
+      if (result.success) {
+        toast.success('Welcome back!');
+        const redirect = searchParams.get('redirect');
+        if (redirect) {
+          navigate(redirect);
+        } else if (result.user?.is_superuser || result.user?.role === 'SUPER_ADMIN') {
+          navigate('/admin');
+        } else if (result.user?.role === 'AGENT') {
+          navigate('/agent');
+        } else {
+          navigate('/planner/wizard');
+        }
+      } else {
+        toast.error(result.error);
+      }
+    } else {
+      // Register
+      const regData = { name: form.name, email: form.email, phone: form.phone, password: form.password };
+      const result = await register(regData);
+      if (result.success) {
+        toast.success('Account created! Please login.');
+        setMode('login');
+        setForm(f => ({ ...f, name: '', phone: '' }));
+      } else {
+        toast.error(result.error);
+      }
+    }
   };
 
   return (
@@ -83,10 +105,14 @@ export default function AuthPage() {
                   </>
                 )}
 
-                <button type="submit"
-                  className="w-full bg-brand text-white py-4 rounded-2xl font-bold hover:bg-brand-hover shadow-lg shadow-brand/20 transition-all flex items-center justify-center gap-2 group cursor-pointer mt-6">
-                  {mode === 'login' ? 'Sign In' : 'Create Account'}
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                <button type="submit" disabled={loading}
+                  className="w-full bg-brand text-white py-4 rounded-2xl font-bold hover:bg-brand-hover shadow-lg shadow-brand/20 transition-all flex items-center justify-center gap-2 group cursor-pointer mt-6 disabled:opacity-60">
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                    <>
+                      {mode === 'login' ? 'Sign In' : 'Create Account'}
+                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </>
+                  )}
                 </button>
               </motion.div>
             </AnimatePresence>
