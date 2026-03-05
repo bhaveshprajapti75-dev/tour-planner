@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://tour-planner-ibzz.onrender.com/api/:path*"
+    },
+    {
+      "source": "/media/:path*",
+      "destination": "https://tour-planner-ibzz.onrender.com/media/:path*"
+    }
+  ]
+}

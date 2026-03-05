@@ -47,11 +47,12 @@ const useAuthStore = create(
         } catch (err) {
           const errData = err.response?.data;
           // DRF ValidationError wraps messages in non_field_errors array
-          const message =
+          const raw =
             errData?.detail ||
             errData?.non_field_errors?.[0] ||
             errData?.error ||
-            (typeof errData === 'string' ? errData : 'Login failed');
+            (typeof errData === 'string' ? errData : null);
+          const message = typeof raw === 'string' ? raw : 'Login failed';
           set({ loading: false, error: message });
           return { success: false, error: message };
         }
