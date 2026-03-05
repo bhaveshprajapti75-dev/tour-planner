@@ -1,33 +1,122 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence, useScroll, useTransform, useSpring } from 'framer-motion';
-import { MapPin, Sun, Sunrise, Moon, Replace, Trash2, Train, Hotel, Info, Plus, Check, SquareCheckBig, Download, Share2, Car, Plane } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { MapPin, Sunrise, Sun, Moon, Check, Download, Share2, Plane, Hotel, CalendarDays, Clock, Route, Eye, Receipt, ChevronDown, ChevronUp } from 'lucide-react';
 import usePlannerStore from '../../store/plannerStore';
-import { cities, activities, hotels, getDistance } from '../../data/mockData';
-import ActivityModal from '../../components/planner/ActivityModal';
-import RouteMap from '../../components/planner/RouteMap';
-import LeadGateModal from '../../components/planner/LeadGateModal';
+import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
+
+function MobileSummary({ itinerary, selectedCountry, selectedTemplate, totalDays, totalNights, travelType }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const dayTourTotal = itinerary.reduce((sum, day) => {
+    const price = day.dayTour?.price ? Number(day.dayTour.price) : 0;
+    return sum + price;
+  }, 0);
+
+  const inclusions = (selectedTemplate?.incl_excl || []).filter(ie => ie.type === 'INCLUSION');
+  const exclusions = (selectedTemplate?.incl_excl || []).filter(ie => ie.type === 'EXCLUSION');
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: false }}
+      className="lg:hidden mt-10 bg-white dark:bg-d-card rounded-3xl border border-gray-200 dark:border-white/[0.08] shadow-lg overflow-hidden"
+    >
+      {/* Compact Header */}
+      <div className="p-6 bg-gradient-to-br from-brand to-brand-hover text-white">
+        <div className="flex justify-between items-start">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-widest text-white/60 mb-1">Quotation Summary</div>
+            <div className="text-3xl font-bold tracking-tight">
+              {dayTourTotal > 0 ? `INR ${dayTourTotal.toLocaleString()}` : 'Custom Tour'}
+            </div>
+          </div>
+          <Receipt className="w-8 h-8 text-white/30" />
+        </div>
+        <div className="flex gap-4 mt-4 text-xs font-bold text-white/70">
+          <span>{totalDays}D / {totalNights}N</span>
+          <span>•</span>
+          <span>{selectedCountry?.name}</span>
+          {travelType && <><span>•</span><span>{travelType}</span></>}
+        </div>
+      </div>
+
+      {/* Day-by-day breakdown */}
+      <div className="p-5 space-y-2">
+        {itinerary.map((day) => (
+          <div key={day.dayNumber} className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-white/[0.06] last:border-0">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="w-6 h-6 rounded-full bg-brand/10 text-brand flex items-center justify-center text-xs font-bold shrink-0">{day.dayNumber}</span>
+              <span className="font-medium text-ink/70 dark:text-white/60 line-clamp-1">
+                {day.dayTour?.activity_combination || (day.isDeparture ? 'Departure' : 'Free Day')}
+              </span>
+            </div>
+            {day.dayTour?.price && Number(day.dayTour.price) > 0 && (
+              <span className="font-bold text-ink dark:text-white text-sm shrink-0 ml-2">INR {Number(day.dayTour.price).toLocaleString()}</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Expandable Inclusions/Exclusions */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-center gap-2 py-3 bg-canvas dark:bg-d-surface text-sm font-bold text-ink-light dark:text-white/50 hover:text-ink dark:hover:text-white transition-colors cursor-pointer"
+      >
+        {expanded ? 'Hide' : 'View'} Inclusions & Exclusions
+        {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+      </button>
+
+      {expanded && (
+        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="px-5 pb-5 space-y-4">
+          <div>
+            <h4 className="font-bold text-xs uppercase text-brand mb-2">Included</h4>
+            {inclusions.length === 0 && <p className="text-xs text-ink-light dark:text-white/40">No inclusions</p>}
+            <ul className="space-y-1.5">
+              {inclusions.map(item => (
+                <li key={item.id} className="flex items-start gap-2 text-xs text-ink/70 dark:text-white/60">
+                  <Check className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" strokeWidth={3} />
+                  <span>{item.item_text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-bold text-xs uppercase text-red-500 mb-2">Not Included</h4>
+            {exclusions.length === 0 && <p className="text-xs text-ink-light dark:text-white/40">No exclusions</p>}
+            <ul className="space-y-1.5">
+              {exclusions.map(item => (
+                <li key={item.id} className="flex items-start gap-2 text-xs text-ink/70 dark:text-white/60">
+                  <span className="text-red-400 shrink-0 font-bold">✗</span>
+                  <span>{item.item_text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </motion.div>
+      )}
+    </motion.div>
+  );
+}
 
 export default function ItineraryStep() {
   const store = usePlannerStore();
-  const { itinerary, selectedCities, duration, consentGiven, setConsent, isLoggedIn, generateItinerary, vehicleCategory, removeActivityFromDay } = store;
-  const [selectedActivity, setSelectedActivity] = useState(null);
-  const [showGateModal, setShowGateModal] = useState(false);
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated);
+  const { itinerary, selectedCountry, totalDays, totalNights, startDate, selectedTemplate,
+    dayTourDetails, buildItinerary, savePlan, saving, savedPlan } = store;
 
-  // Timeline Scroll Animation
   const containerRef = useRef(null);
-  const { scrollYProgress } = useScroll({ target: containerRef, offset: ["start center", "end center"] });
-  const scaleY = useSpring(scrollYProgress, { stiffness: 100, damping: 30, restDelta: 0.001 });
 
   useEffect(() => {
-    if (itinerary.length === 0 && selectedCities.length > 0) {
-      generateItinerary();
+    if (itinerary.length === 0 && selectedTemplate) {
+      buildItinerary();
     }
   }, []);
 
   const days = itinerary;
 
-  if (selectedCities.length === 0 || days.length === 0) {
+  if (days.length === 0) {
     return (
       <div className="h-[60vh] flex items-center justify-center text-ink-light font-bold text-lg">
         No itinerary generated. Go back to the wizard to configure your trip.
@@ -36,13 +125,21 @@ export default function ItineraryStep() {
   }
 
   const handleDownload = () => {
-    if (!isLoggedIn) {
-      setShowGateModal(true);
+    toast.success('Generating PDF...');
+    window.dispatchEvent(new CustomEvent('download-pdf'));
+  };
+
+  const handleCreate = async () => {
+    if (!isAuthenticated) {
+      toast.error('Please log in to create your plan');
       return;
     }
-    toast.success('Generating PDF...');
-    // Trigger PDF download from the quotation sidebar
-    window.dispatchEvent(new CustomEvent('download-pdf'));
+    try {
+      await savePlan();
+      toast.success('Plan created successfully! You can now download the PDF.');
+    } catch {
+      toast.error('Failed to create plan');
+    }
   };
 
   return (
@@ -50,43 +147,29 @@ export default function ItineraryStep() {
       <div className="mb-10">
         <h2 className="text-3xl lg:text-4xl font-extrabold tracking-tight text-ink dark:text-white mb-2">Your Itinerary</h2>
         <p className="text-lg text-ink-light dark:text-white/60 font-medium">
-          {duration}-day tour across {selectedCities.length} cities — fully customizable
+          {totalDays}-day tour in {selectedCountry?.name || 'your destination'} — {totalNights} nights
         </p>
       </div>
-
-      <RouteMap />
 
       {/* Timeline Container */}
       <div ref={containerRef} className="relative mt-8 md:mt-12 max-w-6xl md:mx-auto px-4 lg:px-0">
 
-        {/* Sticky Container for Vehicle */}
+        {/* Vertical dashed line (full length) */}
+        <div className="absolute left-[27px] md:left-[220px] top-8 bottom-0 w-0 border-l-[2px] border-dashed border-ink/15 dark:border-white/15 z-0" />
+
+        {/* Sticky plane icon — follows viewport as you scroll */}
         <div className="absolute left-[27px] md:left-[220px] top-4 bottom-0 w-0 z-20 pointer-events-none">
-          <div className="sticky top-1/2 -mt-6 -translate-x-1/2 flex items-center justify-center w-12 h-12 bg-white dark:bg-d-card rounded-full shadow-[0_0_20px_rgba(79,70,229,0.4)] border-4 border-white dark:border-d-card ring-2 ring-brand/20 text-2xl transition-transform duration-300">
-            {vehicleCategory === 'Car Rental' ? '🚘' : vehicleCategory === 'Flight' ? '✈️' : '🚂'}
+          <div className="sticky top-[30vh] -translate-x-1/2 flex items-center justify-center w-12 h-12 bg-white dark:bg-d-card rounded-full shadow-[0_0_20px_rgba(79,70,229,0.4)] border-4 border-white dark:border-d-card ring-2 ring-brand/20 text-2xl">
+            ✈️
           </div>
         </div>
 
-        {/* Vertical dotted line background */}
-        <div className="absolute left-[27px] md:left-[220px] top-8 bottom-0 w-0 border-l-[2px] border-dashed border-ink/15 dark:border-white/15" />
-
-        {/* Animated Progress Line */}
-        <motion.div
-          style={{ scaleY }}
-          className="absolute left-[26.5px] md:left-[219.5px] top-8 bottom-0 w-[3px] bg-gradient-to-b from-brand via-purple-500 to-brand origin-top rounded-full shadow-[0_0_12px_rgba(79,70,229,0.8)] z-0"
-        />
-
         {days.map((day, dIdx) => {
-          const isNewCity = dIdx === 0 || day.cityId !== days[dIdx - 1]?.cityId;
-          const city = cities.find(c => c.id === day.cityId);
-          const nextDay = days[dIdx + 1];
-          const isTransit = nextDay && nextDay.cityId !== day.cityId;
-          const dist = isTransit ? getDistance(day.cityId, nextDay.cityId) : null;
-
-          const vType = vehicleCategory || 'Train';
-          const IconComponent = vType === 'Car Rental' ? Car : vType === 'Flight' ? Plane : Train;
+          const tour = day.dayTour;
+          const attractions = tour?.attractions || [];
 
           return (
-            <motion.div key={day.dayNum}
+            <motion.div key={day.dayNumber}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-50px' }}
@@ -101,9 +184,14 @@ export default function ItineraryStep() {
                 transition={{ type: "spring", stiffness: 400, damping: 15, delay: 0.1 }}
                 className="pl-14 md:pl-0 md:w-[220px] md:pr-10 pt-6 md:pt-4 shrink-0 md:text-right mb-4 md:mb-0">
                 <h4 className="font-extrabold text-2xl lg:text-3xl text-ink dark:text-white tracking-tight mb-1 transition-colors">
-                  Day {String(day.dayNum).padStart(2, '0')}
+                  Day {String(day.dayNumber).padStart(2, '0')}
                 </h4>
                 <div className="text-sm font-bold text-ink-light dark:text-white/60 uppercase tracking-wide">{day.date}</div>
+                {day.isArrival && (
+                  <div className="mt-3">
+                    <span className="px-3 py-1 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 text-xs font-bold inline-block">Arrival Day</span>
+                  </div>
+                )}
                 {day.isDeparture && (
                   <div className="mt-3">
                     <span className="px-3 py-1 rounded-full bg-brand/10 text-brand text-xs font-bold inline-block">Departure Day</span>
@@ -113,174 +201,106 @@ export default function ItineraryStep() {
 
               {/* Right Column (Content) */}
               <div className="pl-14 md:pl-10 flex-1 md:pt-3">
-                {/* City transition header */}
-                {isNewCity && city && (
-                  <motion.div initial={{ x: -20, opacity: 0 }} whileInView={{ x: 0, opacity: 1 }} viewport={{ once: false }} className="mb-6 flex items-center gap-4 bg-white/60 dark:bg-d-card/60 backdrop-blur-md p-4 rounded-2xl shadow-sm border border-white/50 dark:border-white/[0.08] w-fit">
-                    <div className="w-14 h-14 rounded-xl bg-white dark:bg-d-card shadow-sm overflow-hidden shrink-0 border border-ink/[0.08] dark:border-white/[0.08]">
-                      <img src={city.image} className="w-full h-full object-cover scale-110" alt={city.name} />
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-widest font-extrabold text-brand/80 mb-0.5">Arriving in</p>
-                      <h3 className="text-xl font-black text-ink dark:text-white tracking-tight leading-none mb-1.5">{city.name}</h3>
-                      {day.hotel && (
-                        <p className="text-xs text-ink-light dark:text-white/60 font-medium flex items-center gap-1">
-                          <Hotel className="w-3.5 h-3.5 text-brand" /> {day.hotel.name}
-                        </p>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
+                {/* Day Tour Card */}
+                <div className="bg-white dark:bg-d-card rounded-[2rem] border border-ink/[0.04] dark:border-white/[0.04] p-5 shadow-xl shadow-ink/5 dark:shadow-black/20 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300">
 
-                {/* Day Card */}
-                {!day.isDeparture && (
-                  <div className="bg-white dark:bg-d-card rounded-[2rem] border border-ink/[0.04] dark:border-white/[0.04] p-5 shadow-xl shadow-ink/5 dark:shadow-black/20 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300">
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                      <ShiftModule icon={Sunrise} shiftName="Morning" activity={day.shifts.morning}
-                        onViewDetails={() => day.shifts.morning && setSelectedActivity(day.shifts.morning)}
-                        onDelete={() => removeActivityFromDay(day.dayNum, 'morning')} />
-                      <ShiftModule icon={Sun} shiftName="Afternoon" activity={day.shifts.noon}
-                        onViewDetails={() => day.shifts.noon && setSelectedActivity(day.shifts.noon)}
-                        onDelete={() => removeActivityFromDay(day.dayNum, 'noon')} />
-                      <ShiftModule icon={Moon} shiftName="Evening" activity={day.shifts.evening}
-                        onViewDetails={() => day.shifts.evening && setSelectedActivity(day.shifts.evening)}
-                        onDelete={() => removeActivityFromDay(day.dayNum, 'evening')} />
+                  {/* Activity combination header */}
+                  {tour?.activity_combination && (
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center shrink-0">
+                        <Route className="w-4 h-4" />
+                      </div>
+                      <h5 className="font-bold text-ink dark:text-white text-base">{tour.activity_combination}</h5>
                     </div>
+                  )}
+
+                  {/* Itinerary Text */}
+                  {tour?.itinerary_text && (
+                    <p className="text-sm text-ink/70 dark:text-white/60 leading-relaxed mb-4">{tour.itinerary_text}</p>
+                  )}
+
+                  {/* Attractions */}
+                  {attractions.length > 0 && (
+                    <div className="space-y-2 mb-4">
+                      <div className="text-xs uppercase tracking-widest font-extrabold text-ink/40 dark:text-white/30 flex items-center gap-1.5">
+                        <Eye className="w-3.5 h-3.5" /> Attractions
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {attractions.sort((a, b) => a.visit_order - b.visit_order).map((attr) => (
+                          <span key={attr.id}
+                            className="px-3 py-1.5 bg-canvas dark:bg-d-canvas rounded-xl text-xs font-semibold text-ink/70 dark:text-white/60 border border-ink/[0.04] dark:border-white/[0.04]">
+                            {attr.visit_order}. {attr.attraction_name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Meta Info Row */}
+                  <div className="flex flex-wrap items-center gap-3 mt-auto">
+                    {tour?.est_time_distance && (
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-ink-light dark:text-white/50 bg-ink/5 dark:bg-white/5 px-3 py-1.5 rounded-lg">
+                        <Clock className="w-3.5 h-3.5" /> {tour.est_time_distance}
+                      </div>
+                    )}
+                    {tour?.overnight_location && (
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-ink-light dark:text-white/50 bg-ink/5 dark:bg-white/5 px-3 py-1.5 rounded-lg">
+                        <Hotel className="w-3.5 h-3.5" /> Overnight: {tour.overnight_location}
+                      </div>
+                    )}
+                    {tour?.price && Number(tour.price) > 0 && (
+                      <span className="text-brand font-black text-sm ml-auto">
+                        {tour.currency || 'INR'} {Number(tour.price).toLocaleString()}
+                      </span>
+                    )}
                   </div>
-                )}
 
-                {/* Transit Animation Block */}
-                {isTransit && dist && (
-                  <TransitBlock city={city} nextDay={nextDay} dist={dist} vehicleCategory={vehicleCategory} />
-                )}
+                  {/* Departure day — minimal */}
+                  {day.isDeparture && !tour && (
+                    <div className="flex items-center gap-3 text-ink/60 dark:text-white/40">
+                      <Plane className="w-5 h-5 text-brand" />
+                      <span className="font-semibold">Departure — Safe travels!</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </motion.div>
           );
         })}
       </div>
 
-      {/* Consent Section */}
+      {/* Mobile Summary — only visible on small screens (sidebar is hidden) */}
+      <MobileSummary itinerary={days} selectedCountry={selectedCountry} selectedTemplate={selectedTemplate} totalDays={totalDays} totalNights={totalNights} travelType={store.travelType} />
+
+      {/* Bottom Actions */}
       <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: false }}
-        className="mt-12 bg-white dark:bg-d-card rounded-3xl border border-gray-200 dark:border-white/[0.08] p-8 shadow-lg">
-        <h3 className="font-extrabold text-xl text-ink dark:text-white mb-4">Confirm Your Plan</h3>
-        <label className="flex items-start gap-3 cursor-pointer mb-6" onClick={() => setConsent(!consentGiven)}>
-          <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all
-            ${consentGiven ? 'border-brand bg-brand' : 'border-gray-300 dark:border-white/20'}`}>
-            {consentGiven && <Check className="w-4 h-4 text-white" />}
-          </div>
-          <span className="text-sm text-ink-light dark:text-white/60 font-medium">I confirm all selected customization is correct and I would like to generate my final plan.</span>
-        </label>
-        <div className="flex gap-3">
-          <button onClick={handleDownload} disabled={!consentGiven}
-            className="flex items-center gap-2 bg-brand text-white px-6 py-3 rounded-2xl font-bold text-sm hover:bg-brand-hover shadow-lg shadow-brand/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+        className="mt-6 bg-white dark:bg-d-card rounded-3xl border border-gray-200 dark:border-white/[0.08] p-8 shadow-lg">
+        <h3 className="font-extrabold text-xl text-ink dark:text-white mb-4">Ready to Go?</h3>
+        <p className="text-sm text-ink-light dark:text-white/60 font-medium mb-6">
+          Create your plan, download the PDF, or share it with friends.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          {!savedPlan && (
+            <button onClick={handleCreate} disabled={saving}
+              className="flex items-center gap-2 bg-brand text-white px-6 py-3 rounded-2xl font-bold text-sm hover:bg-brand-hover shadow-lg shadow-brand/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+              {saving ? 'Creating…' : 'Create Plan'}
+            </button>
+          )}
+          {savedPlan && (
+            <span className="flex items-center gap-2 bg-green-500/10 text-green-600 dark:text-green-400 px-6 py-3 rounded-2xl font-bold text-sm">
+              <Check className="w-4 h-4" /> Plan Created
+            </span>
+          )}
+          <button onClick={handleDownload}
+            className="flex items-center gap-2 bg-brand text-white px-6 py-3 rounded-2xl font-bold text-sm hover:bg-brand-hover shadow-lg shadow-brand/20 transition-all cursor-pointer">
             <Download className="w-4 h-4" /> Download PDF
           </button>
-          <button className="flex items-center gap-2 bg-canvas dark:bg-d-surface text-ink dark:text-white px-6 py-3 rounded-2xl font-bold text-sm border border-gray-200 dark:border-white/[0.08] hover:bg-gray-100 dark:hover:bg-white/10 transition-all cursor-pointer">
+          <button onClick={() => { navigator.clipboard?.writeText(window.location.href); toast.success('Link copied!'); }}
+            className="flex items-center gap-2 bg-canvas dark:bg-d-surface text-ink dark:text-white px-6 py-3 rounded-2xl font-bold text-sm border border-gray-200 dark:border-white/[0.08] hover:bg-gray-100 dark:hover:bg-white/10 transition-all cursor-pointer">
             <Share2 className="w-4 h-4" /> Share Plan
           </button>
         </div>
       </motion.div>
-
-      <ActivityModal isOpen={!!selectedActivity} onClose={() => setSelectedActivity(null)} activity={selectedActivity} />
-      <LeadGateModal isOpen={showGateModal} onClose={() => setShowGateModal(false)} onSuccess={() => setShowGateModal(false)} />
-    </div>
-  );
-}
-
-function ShiftModule({ icon: Icon, shiftName, activity, onViewDetails, onDelete }) {
-  return (
-    <motion.div whileHover={{ y: -4 }} onClick={onViewDetails}
-      className={`p-5 flex flex-col rounded-[1.5rem] transition-all cursor-pointer min-h-[160px] relative overflow-hidden group
-        ${activity ? 'bg-canvas dark:bg-d-canvas border border-ink/[0.04] dark:border-white/[0.04] shadow-sm hover:shadow-xl hover:border-brand/30' : 'bg-transparent border-2 border-dashed border-ink/10 dark:border-white/10 hover:bg-ink/[0.02] dark:hover:bg-white/5 hover:border-brand/30'}`}>
-
-      {activity && (
-        <div className="absolute inset-0 bg-gradient-to-br from-brand/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-      )}
-
-      <div className="flex items-center justify-between mb-4 relative z-10">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center shrink-0">
-            <Icon className="w-4 h-4" />
-          </div>
-          <span className="text-xs uppercase tracking-widest font-extrabold text-ink/60 dark:text-white/60">{shiftName}</span>
-        </div>
-        {activity && onDelete && (
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="w-8 h-8 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white"
-            title="Remove Activity">
-            <Trash2 className="w-4 h-4" />
-          </button>
-        )}
-      </div>
-
-      {!activity && (
-        <div className="flex-1 flex items-center justify-center relative z-10">
-          <span className="text-sm font-bold text-ink/40 dark:text-white/40 flex items-center gap-1 group-hover:text-brand transition-colors">
-            <Plus className="w-4 h-4" /> Add Activity
-          </span>
-        </div>
-      )}
-
-      {activity && (
-        <div className="flex-1 flex flex-col justify-between relative z-10">
-          <h5 className="font-bold text-ink dark:text-white text-base leading-snug mb-3 group-hover:text-brand transition-colors">{activity.title || activity.name}</h5>
-
-          <div className="flex items-center justify-between mt-auto">
-            <div className="flex items-center gap-2 text-xs font-semibold text-ink-light dark:text-white/50 bg-ink/5 dark:bg-white/5 px-2.5 py-1 rounded-lg">
-              {activity.duration && <span>{activity.duration}</span>}
-            </div>
-            {activity.price !== undefined && activity.price > 0 && (
-              <span className="text-brand font-black">INR {activity.price}</span>
-            )}
-          </div>
-        </div>
-      )}
-    </motion.div>
-  );
-}
-
-function TransitBlock({ city, nextDay, dist, vehicleCategory }) {
-  const ref = useRef(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["end bottom", "center center"] });
-  const lineWidth = useTransform(scrollYProgress, [0, 1], ["0%", "100%"]);
-
-  const vType = vehicleCategory || 'Train';
-  const IconComponent = vType === 'Car Rental' ? Car : vType === 'Flight' ? Plane : Train;
-
-  return (
-    <div ref={ref} className="mt-8 mb-6 relative pb-2 md:pr-10">
-      <div className="bg-canvas/50 dark:bg-d-canvas/50 border border-ink/[0.04] dark:border-white/[0.04] rounded-[1.5rem] p-5 lg:p-6 flex flex-col gap-4 shadow-sm hover:shadow-md transition-shadow">
-
-        <div className="flex justify-between items-center px-1">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center shrink-0 border border-brand/20">
-              <IconComponent className="w-4 h-4" />
-            </div>
-            <span className="text-[11px] uppercase font-black tracking-widest text-brand/80">Transfer ({vType})</span>
-          </div>
-          <span className="text-[11px] font-bold text-ink-light dark:text-white/60 bg-white dark:bg-d-card px-2.5 py-1 rounded-lg border border-ink/[0.06] dark:border-white/[0.06] shadow-sm">
-            {dist.km} km • ~{Math.round(dist.mins / 60)}h {dist.mins % 60}m
-          </span>
-        </div>
-
-        <div className="flex items-center gap-4 w-full mt-2 relative z-10 px-1">
-          <span className="font-extrabold text-base text-ink dark:text-white shrink-0">{city?.name}</span>
-
-          <div className="flex-1 relative h-6 flex items-center mx-2 overflow-visible">
-            {/* Background dashed line */}
-            <div className="absolute left-0 right-0 h-[2px] border-t-2 border-dashed border-ink/15 dark:border-white/10" />
-
-            {/* Animated solid progress line */}
-            <motion.div style={{ width: lineWidth }} className="absolute left-0 h-[2px] bg-brand origin-left shadow-[0_0_8px_rgba(79,70,229,0.5)]" />
-
-            {/* Animated vehicle traveling on the line */}
-            <motion.div style={{ left: lineWidth }} className="absolute text-brand -translate-x-[50%] -ml-1 top-1/2 -mt-3.5 bg-white dark:bg-d-card rounded-full p-1.5 shadow-md border border-brand/20 z-20">
-              <IconComponent className="w-3.5 h-3.5" />
-            </motion.div>
-          </div>
-
-          <span className="font-extrabold text-base text-ink dark:text-white shrink-0">{cities.find(c => c.id === nextDay.cityId)?.name}</span>
-        </div>
-      </div>
     </div>
   );
 }

@@ -12,7 +12,6 @@ const TRAVEL_TYPE_OPTIONS = [
   { value: 'GROUP', label: 'Group Tour' },
   { value: 'SOLO', label: 'Solo Travel' },
   { value: 'COUPLE', label: 'Couple' },
-  { value: 'GENERAL', label: 'General' },
 ];
 
 const VALIDITY_MODE_OPTIONS = [
@@ -30,7 +29,7 @@ const CURRENCY_OPTIONS = [
 
 const DEFAULT_FORM = {
   region: '', activity_combination: '', itinerary_text: '',
-  travel_type: 'GENERAL', validity_mode: 'OPEN', valid_from: '', valid_to: '',
+  travel_type: '', validity_mode: 'OPEN', valid_from: '', valid_to: '',
   price: '', currency: 'INR',
   est_time_distance: '', overnight_location: '', source_file: '',
   display_order: 0, is_active: true,

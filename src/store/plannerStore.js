@@ -1,66 +1,58 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { cities, hotels, activities, sightseeings, getDistance } from '../data/mockData';
+import { geographyAPI, templatesAPI, dayToursAPI, inclusionsAPI, hotelsAPI, plansAPI } from '../services/api';
 
 const usePlannerStore = create(
   persist(
     (set, get) => ({
       // === WIZARD STEP TRACKING ===
       currentStep: 1,
-      totalSteps: 9,
+      totalSteps: 5,
 
-      // === STEP 1: Duration ===
-      duration: 7,
-      nights: 6,
+      // === STEP 1: Country ===
+      countries: [],
+      countriesLoading: false,
+      selectedCountry: null,
+
+      // === STEP 2: Travel Type ===
+      travelType: null, // GROUP, SOLO, COUPLE
+
+      // === STEP 3: Duration + Date ===
+      totalDays: 7,
+      totalNights: 6,
       startDate: null,
 
-      // === STEP 2: Category ===
-      category: null,
-      specialOccasion: null,
-      occasionAddons: [],
-      rooms: [{ adults: 2, youth: 0, children: 0 }],
-      soloSharing: null,
+      // === STEP 2: Regions/Cities ===
+      regions: [],
+      regionsLoading: false,
+      selectedRegions: [],
 
-      // === STEP 3: Cities ===
-      selectedCities: [],
-      cityNights: {},
+      // === STEP 3: Template Selection + Day Tours ===
+      templates: [],
+      templatesLoading: false,
+      selectedTemplate: null,
+      dayTourDetails: {}, // { dayTourId: fullDayTourObject }
+      dayToursLoading: false,
 
-      // === STEP 4: Hotel Category ===
-      hotelCategory: '4 Star',
-      selectedHotels: {},
+      // === Inclusions / Exclusions ===
+      inclusionsData: null, // { INCLUSION: {...}, EXCLUSION: {...} }
+      inclusionsLoading: false,
+      selectedInclusions: [], // IDs of incl/excl items user has selected
 
-      // === STEP 5: Transport ===
-      vehicleCategory: 'Standard',
-      travelType: 'chauffeur',
+      // === Hotels (optional) ===
+      hotels: [],
+      hotelsLoading: false,
 
-      // === STEP 6: Guide ===
-      tourManagerRequired: false,
-      localGuideRequired: false,
+      // === GENERATED ITINERARY ===
+      itinerary: [], // built from template days + dayTour details
 
-      // === STEP 7: Meals ===
-      mealPreference: 'no_meals',
-      dietaryPreference: [],
+      // === SAVED PLAN ===
+      savedPlan: null,
+      saving: false,
 
-      // === STEP 8: Sightseeing ===
-      includeSightseeing: true,
-      selectedSightseeings: [],
-
-      // === STEP 9: Activities ===
-      selectedActivities: [],
-
-      // === ITINERARY (generated) ===
-      itinerary: [],
-
-      // === QUOTATION ===
-      consentGiven: false,
-      isQuotationVisible: false,
-
-      // === AUTH ===
-      currentUser: null,
-      isLoggedIn: false,
-
-      // === HISTORY ===
-      planHistory: [],
+      // === USER PLANS HISTORY ===
+      userPlans: [],
+      userPlansLoading: false,
 
       // ==================
       //      ACTIONS
@@ -69,214 +61,283 @@ const usePlannerStore = create(
       nextStep: () => set((s) => ({ currentStep: Math.min(s.currentStep + 1, s.totalSteps) })),
       prevStep: () => set((s) => ({ currentStep: Math.max(s.currentStep - 1, 1) })),
 
-      setDuration: (days) => set({ duration: days, nights: Math.max(days - 1, 1) }),
-      setStartDate: (date) => set({ startDate: date }),
-
-      setCategory: (cat) => set({ category: cat }),
-      setSpecialOccasion: (occ) => set({ specialOccasion: occ }),
-      setOccasionAddons: (addons) => set({ occasionAddons: addons }),
-      setSoloSharing: (type) => set({ soloSharing: type }),
-
-      addRoom: () => set((s) => ({ rooms: [...s.rooms, { adults: 2, youth: 0, children: 0 }] })),
-      removeRoom: (idx) => set((s) => ({ rooms: s.rooms.filter((_, i) => i !== idx) })),
-      updateRoom: (idx, field, value) => set((s) => ({
-        rooms: s.rooms.map((r, i) => i === idx ? { ...r, [field]: value } : r)
-      })),
-
-      toggleCity: (cityId) => set((s) => {
-        const isSelected = s.selectedCities.includes(cityId);
-        const newCities = isSelected
-          ? s.selectedCities.filter(c => c !== cityId)
-          : [...s.selectedCities, cityId];
-        const nightsPerCity = newCities.length > 0 ? Math.max(1, Math.floor(s.nights / newCities.length)) : 0;
-        const newCityNights = {};
-        newCities.forEach((c, i) => {
-          newCityNights[c] = i === 0 ? s.nights - (nightsPerCity * (newCities.length - 1)) : nightsPerCity;
-        });
-        return { selectedCities: newCities, cityNights: newCityNights };
-      }),
-
-      setCityNights: (cityId, n) => set((s) => ({ cityNights: { ...s.cityNights, [cityId]: n } })),
-
-      setHotelCategory: (cat) => set((s) => {
-        const newHotels = {};
-        s.selectedCities.forEach(cityId => {
-          const cityH = hotels.filter(h => h.cityId === cityId);
-          const match = cityH.find(h => h.category === cat) || cityH[0];
-          if (match) newHotels[cityId] = match.id;
-        });
-        return { hotelCategory: cat, selectedHotels: newHotels };
-      }),
-      setHotelForCity: (cityId, hotelId) => set((s) => ({
-        selectedHotels: { ...s.selectedHotels, [cityId]: hotelId }
-      })),
-
-      setVehicleCategory: (cat) => set({ vehicleCategory: cat }),
-      setTravelType: (type) => set({ travelType: type }),
-
-      setTourManager: (val) => set({ tourManagerRequired: val }),
-      setLocalGuide: (val) => set({ localGuideRequired: val }),
-
-      setMealPreference: (pref) => set({ mealPreference: pref }),
-      toggleDietary: (id) => set((s) => ({
-        dietaryPreference: s.dietaryPreference.includes(id)
-          ? s.dietaryPreference.filter(d => d !== id)
-          : [...s.dietaryPreference, id]
-      })),
-
-      setIncludeSightseeing: (val) => set((s) => {
-        if (val) {
-          const auto = sightseeings.filter(sg => s.selectedCities.includes(sg.cityId)).map(sg => sg.id);
-          return { includeSightseeing: val, selectedSightseeings: auto };
+      // --- Step 1 ---
+      fetchCountries: async () => {
+        set({ countriesLoading: true });
+        try {
+          const { data } = await geographyAPI.getCountries({ page_size: 50 });
+          set({ countries: data.results || [], countriesLoading: false });
+        } catch {
+          set({ countriesLoading: false });
         }
-        return { includeSightseeing: val, selectedSightseeings: [] };
-      }),
-      toggleSightseeing: (id) => set((s) => ({
-        selectedSightseeings: s.selectedSightseeings.includes(id)
-          ? s.selectedSightseeings.filter(x => x !== id)
-          : [...s.selectedSightseeings, id]
-      })),
-
-      toggleActivity: (id) => set((s) => ({
-        selectedActivities: s.selectedActivities.includes(id)
-          ? s.selectedActivities.filter(x => x !== id)
-          : [...s.selectedActivities, id]
-      })),
-
-      generateItinerary: () => set((s) => {
-        const { selectedCities, cityNights, selectedActivities, selectedSightseeings, startDate } = s;
-        if (selectedCities.length === 0) return {};
-        const result = [];
-        let dayCounter = 1;
-        const baseDate = startDate ? new Date(startDate) : new Date();
-
-        selectedCities.forEach((cityId) => {
-          const nCount = cityNights[cityId] || 1;
-          const cityActs = activities.filter(a => a.cityId === cityId && selectedActivities.includes(a.id));
-          const citySights = sightseeings.filter(sg => sg.cityId === cityId && selectedSightseeings.includes(sg.id));
-          const hotel = hotels.find(h => h.id === s.selectedHotels[cityId]);
-
-          for (let n = 0; n < nCount; n++) {
-            const date = new Date(baseDate);
-            date.setDate(date.getDate() + dayCounter - 1);
-            const morningAct = cityActs.find(a => a.shift === 'Morning') || (citySights[0] ? { ...citySights[0], title: citySights[0].name, isSightseeing: true } : null);
-            const noonAct = cityActs.find(a => a.shift === 'Noon') || (citySights[1] ? { ...citySights[1], title: citySights[1].name, isSightseeing: true } : null);
-            const eveningAct = cityActs.find(a => a.shift === 'Evening') || null;
-
-            result.push({
-              dayNum: dayCounter,
-              date: date.toISOString().split('T')[0],
-              cityId,
-              hotel,
-              shifts: { morning: morningAct, noon: noonAct, evening: eveningAct }
-            });
-            dayCounter++;
-          }
-        });
-
-        if (result.length < s.duration) {
-          const lastCity = selectedCities[selectedCities.length - 1];
-          const date = new Date(baseDate);
-          date.setDate(date.getDate() + dayCounter - 1);
-          result.push({
-            dayNum: dayCounter, date: date.toISOString().split('T')[0], cityId: lastCity,
-            hotel: null, shifts: { morning: null, noon: null, evening: null }, isDeparture: true,
-          });
-        }
-        return { itinerary: result };
-      }),
-
-      removeActivityFromDay: (dayNum, shiftName) => set((s) => {
-        const newItin = s.itinerary.map((day) => {
-          if (day.dayNum === dayNum) {
-            return {
-              ...day,
-              shifts: {
-                ...day.shifts,
-                [shiftName.toLowerCase()]: null
-              }
-            };
-          }
-          return day;
-        });
-        return { itinerary: newItin };
-      }),
-
-      getQuotation: () => {
-        const s = get();
-        const totalRooms = s.category === 'couple' ? 1 : s.category === 'solo' ? 1 : s.rooms.length;
-        const totalPax = s.category === 'couple' ? 2 : s.category === 'solo' ? 1
-          : s.rooms.reduce((acc, r) => acc + r.adults + r.youth + r.children, 0);
-
-        let hotelCost = 0;
-        s.selectedCities.forEach(cityId => {
-          const hotel = hotels.find(h => h.id === s.selectedHotels[cityId]);
-          const nts = s.cityNights[cityId] || 1;
-          if (hotel) hotelCost += hotel.price * nts * totalRooms;
-        });
-
-        let transportKm = 0;
-        for (let i = 0; i < s.selectedCities.length - 1; i++) {
-          transportKm += getDistance(s.selectedCities[i], s.selectedCities[i + 1]).km;
-        }
-        const pricePerKm = s.vehicleCategory === 'Premium' ? 4.0 : s.vehicleCategory === 'Standard' ? 2.5 : 1.5;
-        const transportCost = transportKm * pricePerKm;
-
-        const actCost = s.selectedActivities.reduce((acc, id) => {
-          const act = activities.find(a => a.id === id);
-          return acc + (act ? act.price * totalPax : 0);
-        }, 0);
-
-        const sightCost = s.selectedSightseeings.reduce((acc, id) => {
-          const sg = sightseeings.find(x => x.id === id);
-          return acc + (sg ? sg.cost * totalPax : 0);
-        }, 0);
-
-        const guideCost = (s.tourManagerRequired ? 150 * s.duration : 0) + (s.localGuideRequired ? 100 * s.duration : 0);
-        const mealPricePerDay = s.mealPreference === 'chef' ? 50 : s.mealPreference === 'local' ? 35 : 0;
-        const mealCost = mealPricePerDay * s.duration * totalPax;
-
-        const subTotal = hotelCost + transportCost + actCost + sightCost + guideCost + mealCost;
-        const gst = Math.round(subTotal * 0.05);
-        const total = subTotal + gst;
-
-        return {
-          hotelCost: Math.round(hotelCost), transportCost: Math.round(transportCost),
-          activityCost: Math.round(actCost), sightseeingCost: Math.round(sightCost),
-          guideCost: Math.round(guideCost), mealCost: Math.round(mealCost),
-          subTotal: Math.round(subTotal), gst, total, totalPax, totalRooms,
-          perPerson: totalPax > 0 ? Math.round(total / totalPax) : 0,
-        };
       },
 
-      setConsent: (val) => set({ consentGiven: val }),
-      showQuotation: () => set({ isQuotationVisible: true }),
-
-      login: (user) => set({ currentUser: user, isLoggedIn: true }),
-      logout: () => set({ currentUser: null, isLoggedIn: false }),
-
-      savePlan: () => set((s) => {
-        const plan = {
-          id: `plan_${Date.now()}`,
-          name: `Swiss Tour - ${s.selectedCities.map(c => cities.find(x => x.id === c)?.name).join(', ')}`,
-          createdAt: new Date().toISOString().split('T')[0],
-          status: 'draft', duration: s.duration, category: s.category,
-          cities: s.selectedCities, totalAmount: s.getQuotation().total, itinerary: s.itinerary,
-        };
-        return { planHistory: [...s.planHistory, plan] };
+      setSelectedCountry: (country) => set({
+        selectedCountry: country,
+        regions: [],
+        selectedRegions: [],
+        templates: [],
+        selectedTemplate: null,
+        dayTourDetails: {},
+        inclusionsData: null,
+        itinerary: [],
       }),
 
+      setTravelType: (type) => set({ travelType: type }),
+      setTotalDays: (days) => set({ totalDays: days, totalNights: Math.max(days - 1, 1) }),
+      setStartDate: (date) => set({ startDate: date }),
+
+      // --- Step 2 ---
+      fetchRegions: async (countryId) => {
+        set({ regionsLoading: true });
+        try {
+          const { data } = await geographyAPI.getRegions({ country: countryId, page_size: 50 });
+          set({ regions: data.results || [], regionsLoading: false });
+        } catch {
+          set({ regionsLoading: false });
+        }
+      },
+
+      toggleRegion: (regionId) => set((s) => {
+        const isSelected = s.selectedRegions.includes(regionId);
+        return {
+          selectedRegions: isSelected
+            ? s.selectedRegions.filter(r => r !== regionId)
+            : [...s.selectedRegions, regionId]
+        };
+      }),
+
+      // --- Step 3 ---
+      fetchTemplates: async (countryId, totalDays) => {
+        set({ templatesLoading: true });
+        try {
+          const { data } = await templatesAPI.getTemplates({
+            country: countryId,
+            total_days: totalDays,
+            page_size: 50,
+          });
+          set({ templates: data.results || [], templatesLoading: false });
+        } catch {
+          set({ templatesLoading: false });
+        }
+      },
+
+      selectTemplate: (template) => {
+        // Extract day tour details from nested day_tour_detail in template response
+        const details = { ...get().dayTourDetails };
+        for (const day of (template.days || [])) {
+          if (day.day_tour_detail && day.day_tour) {
+            details[day.day_tour] = day.day_tour_detail;
+          }
+        }
+        // Auto-init inclusions from template's attached incl/excl
+        const inclIds = (template.incl_excl || []).map(ie => ie.incl_excl);
+        set({ selectedTemplate: template, dayTourDetails: details, dayToursLoading: false, selectedInclusions: inclIds });
+        // Also fetch grouped inclusions for display if not loaded yet
+        const { inclusionsData, selectedCountry } = get();
+        if (!inclusionsData && selectedCountry) {
+          get().fetchInclusions(selectedCountry.id);
+        }
+      },
+
+      // --- Inclusions ---
+      fetchInclusions: async (countryId) => {
+        set({ inclusionsLoading: true });
+        try {
+          const { data } = await inclusionsAPI.getGrouped({ country: countryId });
+          set({ inclusionsData: data, inclusionsLoading: false });
+        } catch {
+          set({ inclusionsLoading: false });
+        }
+      },
+
+      toggleInclusion: (id) => set((s) => {
+        const isSelected = s.selectedInclusions.includes(id);
+        return {
+          selectedInclusions: isSelected
+            ? s.selectedInclusions.filter(i => i !== id)
+            : [...s.selectedInclusions, id]
+        };
+      }),
+
+      setSelectedInclusions: (ids) => set({ selectedInclusions: ids }),
+
+      // Initialize inclusions from template's attached incl/excl
+      initInclusionsFromTemplate: () => {
+        const { selectedTemplate } = get();
+        if (selectedTemplate?.incl_excl) {
+          const ids = selectedTemplate.incl_excl.map(ie => ie.incl_excl);
+          set({ selectedInclusions: ids });
+        }
+      },
+
+      // --- Hotels ---
+      fetchHotels: async (regionId) => {
+        set({ hotelsLoading: true });
+        try {
+          const { data } = await hotelsAPI.getHotels({ region: regionId, page_size: 50 });
+          set({ hotels: data.results || [], hotelsLoading: false });
+        } catch {
+          set({ hotelsLoading: false });
+        }
+      },
+
+      // --- Build Itinerary from Template ---
+      buildItinerary: () => {
+        const { selectedTemplate, dayTourDetails, startDate } = get();
+        if (!selectedTemplate) return;
+
+        const days = [...(selectedTemplate.days || [])].sort((a, b) => a.day_number - b.day_number);
+        const baseDate = startDate ? new Date(startDate) : new Date();
+
+        const itinerary = days.map((d) => {
+          const date = new Date(baseDate);
+          date.setDate(date.getDate() + d.day_number - 1);
+          // Use nested day_tour_detail first, fall back to separately fetched details
+          const tour = d.day_tour_detail || dayTourDetails[d.day_tour] || null;
+
+          return {
+            dayNumber: d.day_number,
+            date: date.toISOString().split('T')[0],
+            isArrival: d.is_arrival_day,
+            isDeparture: d.is_departure_day,
+            dayTourId: d.day_tour,
+            dayTour: tour,
+            templateDayId: d.id,
+          };
+        });
+
+        set({ itinerary });
+      },
+
+      // --- Save Plan to Backend ---
+      savePlan: async ({ name, clientName, clientEmail, clientPhone, notes } = {}) => {
+        const { selectedCountry, selectedTemplate, totalDays, totalNights, startDate, itinerary, selectedInclusions, savedPlan: existingPlan } = get();
+        if (!selectedCountry) return null;
+
+        set({ saving: true });
+        try {
+          const planPayload = {
+            country: selectedCountry.id,
+            based_on_template: selectedTemplate?.id || null,
+            name: name || `${selectedCountry.name} ${totalDays}D Tour`,
+            total_days: totalDays,
+            total_nights: totalNights,
+            start_date: startDate || null,
+            client_name: clientName || null,
+            client_email: clientEmail || null,
+            client_phone: clientPhone || null,
+            notes: notes || null,
+            status: 'DRAFT',
+          };
+
+          let plan;
+          if (existingPlan?.id) {
+            // Update existing plan
+            const { data } = await plansAPI.updatePlan(existingPlan.id, planPayload);
+            plan = data;
+
+            // Delete old days and inclusions, then re-create
+            if (existingPlan.days?.length) {
+              await Promise.all(existingPlan.days.map(d => plansAPI.deletePlanDay(d.id)));
+            }
+            if (existingPlan.incl_excl?.length) {
+              await Promise.all(existingPlan.incl_excl.map(ie => plansAPI.deletePlanInclExcl(ie.id)));
+            }
+          } else {
+            // Create new plan
+            const { data } = await plansAPI.createPlan(planPayload);
+            plan = data;
+          }
+
+          // Create plan days
+          await Promise.all(
+            itinerary.map((day) =>
+              plansAPI.createPlanDay({
+                user_plan: plan.id,
+                day_number: day.dayNumber,
+                day_tour: day.dayTourId,
+              })
+            )
+          );
+
+          // Add selected inclusions/exclusions
+          if (selectedInclusions.length > 0) {
+            await Promise.all(
+              selectedInclusions.map((inclId) =>
+                plansAPI.createPlanInclExcl({
+                  user_plan: plan.id,
+                  incl_excl: inclId,
+                })
+              )
+            );
+          }
+
+          // Fetch the complete saved plan
+          const { data: savedPlan } = await plansAPI.getPlan(plan.id);
+          set({ savedPlan, saving: false });
+          return savedPlan;
+        } catch (e) {
+          set({ saving: false });
+          throw e;
+        }
+      },
+
+      // --- User Plans History ---
+      fetchUserPlans: async () => {
+        set({ userPlansLoading: true });
+        try {
+          const { data } = await plansAPI.getPlans({ page_size: 50 });
+          set({ userPlans: data.results || [], userPlansLoading: false });
+        } catch {
+          set({ userPlansLoading: false });
+        }
+      },
+
+      deletePlan: async (id) => {
+        await plansAPI.deletePlan(id);
+        set((s) => ({ userPlans: s.userPlans.filter(p => p.id !== id) }));
+      },
+
+      clonePlan: async (id) => {
+        const { data } = await plansAPI.clonePlan(id);
+        await get().fetchUserPlans();
+        return data;
+      },
+
+      // --- Reset ---
       resetPlanner: () => set({
-        currentStep: 1, duration: 7, nights: 6, startDate: null, category: null,
-        specialOccasion: null, occasionAddons: [], rooms: [{ adults: 2, youth: 0, children: 0 }],
-        soloSharing: null, selectedCities: [], cityNights: {}, hotelCategory: '4 Star',
-        selectedHotels: {}, vehicleCategory: 'Standard', travelType: 'chauffeur',
-        tourManagerRequired: false, localGuideRequired: false, mealPreference: 'no_meals',
-        dietaryPreference: [], includeSightseeing: true, selectedSightseeings: [],
-        selectedActivities: [], itinerary: [], consentGiven: false, isQuotationVisible: false,
+        currentStep: 1,
+        selectedCountry: null,
+        travelType: null,
+        totalDays: 7,
+        totalNights: 6,
+        startDate: null,
+        regions: [],
+        selectedRegions: [],
+        templates: [],
+        selectedTemplate: null,
+        dayTourDetails: {},
+        inclusionsData: null,
+        selectedInclusions: [],
+        hotels: [],
+        itinerary: [],
+        savedPlan: null,
       }),
     }),
-    { name: 'swiss-planner-storage' }
+    {
+      name: 'tour-planner-wizard',
+      partialize: (state) => ({
+        currentStep: state.currentStep,
+        selectedCountry: state.selectedCountry,
+        travelType: state.travelType,
+        totalDays: state.totalDays,
+        totalNights: state.totalNights,
+        startDate: state.startDate,
+        selectedRegions: state.selectedRegions,
+        selectedTemplate: state.selectedTemplate,
+      }),
+    }
   )
 );
 

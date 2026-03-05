@@ -146,6 +146,17 @@ export const plansAPI = {
   updatePlan: (id, data) => api.patch(`/user-plans/plans/${id}/`, data),
   deletePlan: (id) => api.delete(`/user-plans/plans/${id}/`),
   clonePlan: (id) => api.post(`/user-plans/plans/${id}/clone/`),
+
+  // Plan Days
+  getPlanDays: (params) => api.get('/user-plans/plan-days/', { params }),
+  createPlanDay: (data) => api.post('/user-plans/plan-days/', data),
+  updatePlanDay: (id, data) => api.patch(`/user-plans/plan-days/${id}/`, data),
+  deletePlanDay: (id) => api.delete(`/user-plans/plan-days/${id}/`),
+
+  // Plan Inclusions/Exclusions
+  getPlanInclExcl: (params) => api.get('/user-plans/plan-incl/', { params }),
+  createPlanInclExcl: (data) => api.post('/user-plans/plan-incl/', data),
+  deletePlanInclExcl: (id) => api.delete(`/user-plans/plan-incl/${id}/`),
 };
 
 // ==================== AUDIT ====================

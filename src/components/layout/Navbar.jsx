@@ -1,26 +1,27 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Compass, User, Menu, X, History, LogOut, LayoutDashboard, Sun, Moon } from 'lucide-react';
+import { Compass, User, Menu, X, History, LogOut, LayoutDashboard, Sun, Moon, Briefcase } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import usePlannerStore from '../../store/plannerStore';
+import useAuthStore from '../../store/authStore';
 import useThemeStore from '../../store/themeStore';
 
 export default function Navbar() {
-    const { isLoggedIn, currentUser, logout } = usePlannerStore();
+    const { isAuthenticated, user, logout: authLogout, isAdmin, isAgent } = useAuthStore();
     const { theme, toggleTheme } = useThemeStore();
     const navigate = useNavigate();
     const [mobileOpen, setMobileOpen] = useState(false);
 
-    const handleLogout = () => {
-        logout();
+    const handleLogout = async () => {
+        await authLogout();
         navigate('/');
         setMobileOpen(false);
     };
 
     const navLinks = [
         { to: '/planner/wizard', label: 'Plan Trip', show: true },
-        { to: '/history', label: 'My Plans', show: isLoggedIn, icon: History },
-        { to: '/admin', label: 'Admin', show: true, icon: LayoutDashboard },
+        { to: '/history', label: 'My Plans', show: isAuthenticated, icon: History },
+        { to: '/admin', label: 'Admin', show: isAdmin(), icon: LayoutDashboard },
+        { to: '/agent', label: 'Agent', show: isAgent(), icon: Briefcase },
     ];
 
     return (
@@ -55,13 +56,13 @@ export default function Navbar() {
                             {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
                         </button>
 
-                        {isLoggedIn ? (
+                        {isAuthenticated ? (
                             <div className="flex items-center gap-3">
                                 <div className="flex items-center gap-2 bg-canvas dark:bg-white/10 px-4 py-2.5 rounded-2xl border border-gray-200 dark:border-white/10">
                                     <div className="w-7 h-7 rounded-full bg-brand text-white flex items-center justify-center text-xs font-bold">
-                                        {(currentUser?.name || 'U').charAt(0).toUpperCase()}
+                                        {(user?.name || 'U').charAt(0).toUpperCase()}
                                     </div>
-                                    <span className="text-sm font-bold text-ink dark:text-white max-w-[100px] truncate">{currentUser?.name || 'User'}</span>
+                                    <span className="text-sm font-bold text-ink dark:text-white max-w-[100px] truncate">{user?.name || 'User'}</span>
                                 </div>
                                 <button onClick={handleLogout} className="text-sm font-bold text-red-500 hover:text-red-600 transition-colors cursor-pointer p-2">
                                     <LogOut className="w-4 h-4" />
@@ -104,7 +105,7 @@ export default function Navbar() {
                                     {link.label}
                                 </Link>
                             ))}
-                            {isLoggedIn ? (
+                            {isAuthenticated ? (
                                 <button onClick={handleLogout} className="w-full text-left text-sm font-bold text-red-500 py-2">Logout</button>
                             ) : (
                                 <Link to="/auth" onClick={() => setMobileOpen(false)} className="block text-sm font-bold text-brand py-2">Sign In</Link>

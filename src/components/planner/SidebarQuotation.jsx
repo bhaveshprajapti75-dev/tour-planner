@@ -1,18 +1,14 @@
  import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, MapPin, Users, Check, X, Share2, Download, Receipt, Hotel, Car, Utensils, Eye, UserCheck, Footprints } from 'lucide-react';
+import { Check, X, Share2, Download, Receipt, CalendarDays, MapPin, Users, Route } from 'lucide-react';
 import usePlannerStore from '../../store/plannerStore';
-import { cities, hotels } from '../../data/mockData';
 import toast from 'react-hot-toast';
 
 export default function SidebarQuotation() {
     const store = usePlannerStore();
-    const { duration, category, selectedCities, selectedHotels, vehicleCategory, travelType,
-        tourManagerRequired, localGuideRequired, mealPreference, selectedActivities,
-        selectedSightseeings, cityNights, rooms } = store;
-    const [activeTab, setActiveTab] = useState('pricing');
-
-    const q = store.getQuotation();
+    const { totalDays, totalNights, travelType, selectedCountry, itinerary, dayTourDetails,
+        selectedTemplate } = store;
+    const [activeTab, setActiveTab] = useState('summary');
 
     const handleDownloadPDF = useCallback(() => {
         window.dispatchEvent(new CustomEvent('download-pdf'));
@@ -24,14 +20,15 @@ export default function SidebarQuotation() {
         toast.success('Link copied to clipboard!');
     }, []);
 
-    const lineItems = [
-        { label: 'Hotels', value: q.hotelCost, icon: Hotel, show: q.hotelCost > 0 },
-        { label: 'Transport', value: q.transportCost, icon: Car, show: q.transportCost > 0 },
-        { label: 'Sightseeing', value: q.sightseeingCost, icon: Eye, show: q.sightseeingCost > 0 },
-        { label: 'Activities', value: q.activityCost, icon: Footprints, show: q.activityCost > 0 },
-        { label: 'Guide / Manager', value: q.guideCost, icon: UserCheck, show: q.guideCost > 0 },
-        { label: 'Meals', value: q.mealCost, icon: Utensils, show: q.mealCost > 0 },
-    ].filter(i => i.show);
+    // Calculate total from day tour prices
+    const dayTourTotal = itinerary.reduce((sum, day) => {
+        const price = day.dayTour?.price ? Number(day.dayTour.price) : 0;
+        return sum + price;
+    }, 0);
+
+    // Gather inclusions/exclusions from template's own incl_excl data
+    const selectedItems = (selectedTemplate?.incl_excl || []).filter(ie => ie.type === 'INCLUSION');
+    const excludedItems = (selectedTemplate?.incl_excl || []).filter(ie => ie.type === 'EXCLUSION');
 
     return (
         <div className="bg-white dark:bg-d-card rounded-[2.5rem] shadow-xl shadow-ink/5 dark:shadow-black/20 border border-gray-100 dark:border-white/[0.08] flex flex-col max-h-[calc(100vh-8rem)] overflow-hidden">
@@ -42,15 +39,15 @@ export default function SidebarQuotation() {
                 <div className="grid grid-cols-3 gap-3">
                     <div className="bg-white dark:bg-d-surface p-3 rounded-2xl shadow-sm border border-gray-100 dark:border-white/[0.08] text-center">
                         <div className="text-[10px] uppercase font-bold text-ink-light dark:text-white/50 tracking-wider">Days</div>
-                        <div className="font-bold text-ink dark:text-white text-lg">{duration}</div>
+                        <div className="font-bold text-ink dark:text-white text-lg">{totalDays}</div>
                     </div>
                     <div className="bg-white dark:bg-d-surface p-3 rounded-2xl shadow-sm border border-gray-100 dark:border-white/[0.08] text-center">
-                        <div className="text-[10px] uppercase font-bold text-ink-light dark:text-white/50 tracking-wider">Pax</div>
-                        <div className="font-bold text-ink dark:text-white text-lg">{q.totalPax}</div>
+                        <div className="text-[10px] uppercase font-bold text-ink-light dark:text-white/50 tracking-wider">Nights</div>
+                        <div className="font-bold text-ink dark:text-white text-lg">{totalNights}</div>
                     </div>
                     <div className="bg-white dark:bg-d-surface p-3 rounded-2xl shadow-sm border border-gray-100 dark:border-white/[0.08] text-center">
-                        <div className="text-[10px] uppercase font-bold text-ink-light dark:text-white/50 tracking-wider">Rooms</div>
-                        <div className="font-bold text-ink dark:text-white text-lg">{q.totalRooms}</div>
+                        <div className="text-[10px] uppercase font-bold text-ink-light dark:text-white/50 tracking-wider">Type</div>
+                        <div className="font-bold text-ink dark:text-white text-sm">{travelType || '—'}</div>
                     </div>
                 </div>
             </div>
@@ -59,10 +56,10 @@ export default function SidebarQuotation() {
             <div className="px-8 pb-4">
                 <div className="flex bg-canvas dark:bg-d-surface p-1.5 rounded-full border border-gray-200/60 dark:border-white/[0.08] shadow-inner">
                     <button
-                        onClick={() => setActiveTab('pricing')}
-                        className={`flex-1 py-2.5 rounded-full text-xs tracking-wide font-bold transition-all cursor-pointer ${activeTab === 'pricing' ? 'text-white bg-brand shadow-md shadow-brand/20' : 'text-ink-light dark:text-white/50 hover:text-ink dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/10'}`}
+                        onClick={() => setActiveTab('summary')}
+                        className={`flex-1 py-2.5 rounded-full text-xs tracking-wide font-bold transition-all cursor-pointer ${activeTab === 'summary' ? 'text-white bg-brand shadow-md shadow-brand/20' : 'text-ink-light dark:text-white/50 hover:text-ink dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/10'}`}
                     >
-                        Pricing
+                        Summary
                     </button>
                     <button
                         onClick={() => setActiveTab('includes')}
@@ -76,52 +73,62 @@ export default function SidebarQuotation() {
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto px-8 pb-8 hide-scrollbar">
                 <AnimatePresence mode="wait">
-                    {activeTab === 'pricing' && (
+                    {activeTab === 'summary' && (
                         <motion.div
-                            key="pricing"
+                            key="summary"
                             initial={{ opacity: 0, x: 10 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -10 }}
                             className="space-y-6"
                         >
-                            {/* Grand Total */}
-                            <div className="bg-gradient-to-br from-brand to-brand-hover p-6 rounded-3xl relative overflow-hidden shadow-lg shadow-brand/30 text-white">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 blur-2xl" />
-                                <div className="relative z-10">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <Receipt className="w-6 h-6 text-brand-100" />
-                                        <div className="text-[10px] font-bold text-brand-100 uppercase tracking-widest text-right">Total Quote</div>
-                                    </div>
-                                    <div className="text-4xl font-bold tracking-tighter">
-                                        INR {q.total.toLocaleString()}
-                                    </div>
-                                    {q.totalPax > 1 && (
-                                        <div className="text-sm text-brand-100 mt-2 font-medium">
-                                            INR {q.perPerson.toLocaleString()} per person
+                            {/* Total if available */}
+                            {dayTourTotal > 0 && (
+                                <div className="bg-gradient-to-br from-brand to-brand-hover p-6 rounded-3xl relative overflow-hidden shadow-lg shadow-brand/30 text-white">
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 blur-2xl" />
+                                    <div className="relative z-10">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <Receipt className="w-6 h-6 text-brand-100" />
+                                            <div className="text-[10px] font-bold text-brand-100 uppercase tracking-widest text-right">Estimated Total</div>
                                         </div>
-                                    )}
+                                        <div className="text-4xl font-bold tracking-tighter">
+                                            INR {dayTourTotal.toLocaleString()}
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
-                            {/* Line Items */}
+                            {/* Route Summary */}
                             <div className="space-y-3 text-sm bg-gray-50/50 dark:bg-d-surface/50 p-5 rounded-3xl border border-gray-100 dark:border-white/[0.08]">
-                                {lineItems.map((item, i) => (
-                                    <div key={item.label} className={`flex justify-between items-center py-2 ${i < lineItems.length - 1 ? 'border-b border-gray-200/60 dark:border-white/[0.06] pb-3' : ''}`}>
-                                        <div className="flex items-center gap-2 text-ink-light dark:text-white/60 font-medium">
-                                            <item.icon className="w-4 h-4 text-brand" />
-                                            {item.label}
+                                <div className="text-xs uppercase tracking-widest font-extrabold text-ink/40 dark:text-white/30 mb-3 flex items-center gap-1.5">
+                                    <Route className="w-3.5 h-3.5" /> Day-by-Day
+                                </div>
+                                {itinerary.map((day) => (
+                                    <div key={day.dayNumber} className={`flex justify-between items-center py-2 ${day.dayNumber < itinerary.length ? 'border-b border-gray-200/60 dark:border-white/[0.06] pb-3' : ''}`}>
+                                        <div className="flex items-center gap-2 text-ink/70 dark:text-white/60 font-medium">
+                                            <span className="w-6 h-6 rounded-full bg-brand/10 text-brand flex items-center justify-center text-xs font-bold shrink-0">{day.dayNumber}</span>
+                                            <span className="line-clamp-1">{day.dayTour?.activity_combination || (day.isDeparture ? 'Departure' : 'Free Day')}</span>
                                         </div>
-                                        <div className="font-bold text-ink dark:text-white">INR {item.value.toLocaleString()}</div>
+                                        {day.dayTour?.price && Number(day.dayTour.price) > 0 && (
+                                            <div className="font-bold text-ink dark:text-white shrink-0 ml-2">INR {Number(day.dayTour.price).toLocaleString()}</div>
+                                        )}
                                     </div>
                                 ))}
-                                <div className="flex justify-between items-center pt-2 border-t border-gray-300/60 dark:border-white/10">
-                                    <div className="text-ink dark:text-white font-bold">Subtotal</div>
-                                    <div className="font-bold text-ink dark:text-white">INR {q.subTotal.toLocaleString()}</div>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <div className="text-ink-light dark:text-white/60 font-medium">GST (5%)</div>
-                                    <div className="font-bold text-ink dark:text-white">INR {q.gst.toLocaleString()}</div>
-                                </div>
+                            </div>
+
+                            {/* Country + Template */}
+                            <div className="space-y-2 text-sm bg-gray-50/50 dark:bg-d-surface/50 p-5 rounded-3xl border border-gray-100 dark:border-white/[0.08]">
+                                {selectedCountry && (
+                                    <div className="flex justify-between items-center py-1">
+                                        <span className="text-ink-light dark:text-white/60 font-medium flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-brand" /> Country</span>
+                                        <span className="font-bold text-ink dark:text-white">{selectedCountry.name}</span>
+                                    </div>
+                                )}
+                                {selectedTemplate && (
+                                    <div className="flex justify-between items-center py-1">
+                                        <span className="text-ink-light dark:text-white/60 font-medium flex items-center gap-1.5"><CalendarDays className="w-3.5 h-3.5 text-brand" /> Template</span>
+                                        <span className="font-bold text-ink dark:text-white text-right max-w-[180px] truncate">{selectedTemplate.name}</span>
+                                    </div>
+                                )}
                             </div>
                         </motion.div>
                     )}
@@ -134,47 +141,33 @@ export default function SidebarQuotation() {
                             exit={{ opacity: 0, x: -10 }}
                             className="space-y-6"
                         >
+                            {/* Inclusions */}
                             <div className="bg-gray-50/50 dark:bg-d-surface/50 p-5 rounded-3xl border border-gray-100 dark:border-white/[0.08]">
                                 <h4 className="font-bold text-ink dark:text-white uppercase text-xs mb-4">Included</h4>
                                 <ul className="space-y-3">
-                                    {selectedCities.map(id => {
-                                        const city = cities.find(c => c.id === id);
-                                        const hotel = hotels.find(h => h.id === selectedHotels[id]);
-                                        return (
-                                            <li key={`inc-${id}`} className="flex items-start gap-3 text-sm text-ink-light">
-                                                <div className="w-5 h-5 rounded-full bg-brand/10 text-brand flex items-center justify-center shrink-0 mt-0.5"><Check className="w-3 h-3" strokeWidth={3} /></div>
-                                                <span className="font-medium">{city?.name}: {hotel?.name || 'Hotel'} ({cityNights[id]}N)</span>
-                                            </li>
-                                        );
-                                    })}
-                                    {vehicleCategory && (
-                                        <li className="flex items-start gap-3 text-sm text-ink-light">
-                                            <div className="w-5 h-5 rounded-full bg-brand/10 text-brand flex items-center justify-center shrink-0 mt-0.5"><Check className="w-3 h-3" strokeWidth={3} /></div>
-                                            <span className="font-medium">{vehicleCategory} Vehicle ({travelType})</span>
-                                        </li>
+                                    {selectedItems.length === 0 && (
+                                        <li className="text-sm text-ink-light dark:text-white/40 font-medium">No inclusions selected</li>
                                     )}
-                                    {tourManagerRequired && (
-                                        <li className="flex items-start gap-3 text-sm text-ink-light">
+                                    {selectedItems.map(item => (
+                                        <li key={item.id} className="flex items-start gap-3 text-sm text-ink-light">
                                             <div className="w-5 h-5 rounded-full bg-brand/10 text-brand flex items-center justify-center shrink-0 mt-0.5"><Check className="w-3 h-3" strokeWidth={3} /></div>
-                                            <span className="font-medium">Tour Manager</span>
+                                            <span className="font-medium">{item.item_text}</span>
                                         </li>
-                                    )}
-                                    {mealPreference !== 'no_meals' && (
-                                        <li className="flex items-start gap-3 text-sm text-ink-light">
-                                            <div className="w-5 h-5 rounded-full bg-brand/10 text-brand flex items-center justify-center shrink-0 mt-0.5"><Check className="w-3 h-3" strokeWidth={3} /></div>
-                                            <span className="font-medium">Meals ({mealPreference === 'chef' ? 'Private Chef' : 'Local Restaurants'})</span>
-                                        </li>
-                                    )}
+                                    ))}
                                 </ul>
                             </div>
 
+                            {/* Exclusions */}
                             <div className="bg-red-50/50 dark:bg-red-950/20 p-5 rounded-3xl border border-red-100/50 dark:border-red-500/10">
                                 <h4 className="font-bold text-ink dark:text-white uppercase text-xs mb-4">Not Included</h4>
                                 <ul className="space-y-3">
-                                    {['International flights', 'Travel insurance', 'Personal expenses', 'Tips & gratuities'].map(item => (
-                                        <li key={item} className="flex items-start gap-3 text-sm text-ink-light">
+                                    {excludedItems.length === 0 && (
+                                        <li className="text-sm text-ink-light dark:text-white/40 font-medium">No exclusions selected</li>
+                                    )}
+                                    {excludedItems.map(item => (
+                                        <li key={item.id} className="flex items-start gap-3 text-sm text-ink-light">
                                             <div className="w-5 h-5 rounded-full bg-red-100 text-red-500 flex items-center justify-center shrink-0 mt-0.5"><X className="w-3 h-3" strokeWidth={3} /></div>
-                                            <span className="font-medium">{item}</span>
+                                            <span className="font-medium">{item.item_text}</span>
                                         </li>
                                     ))}
                                 </ul>
