@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import {
   LayoutDashboard, Calendar, FileText, Users, Sparkles,
-  ChevronLeft, LogOut, Menu, X, Sun, Moon,
+  ChevronLeft, LogOut, Menu, X, Sun, Moon, Clipboard,
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import useThemeStore from '../../store/themeStore';
@@ -10,12 +10,14 @@ import AgentDashboardPage from './AgentDashboardPage';
 import UsersPage from '../admin/UsersPage';
 import DayToursPage from '../admin/DayToursPage';
 import TemplatesPage from '../admin/TemplatesPage';
+import UserPlansPage from '../admin/UserPlansPage';
 
 const sidebarItems = [
   { path: '', label: 'Dashboard', icon: LayoutDashboard },
   { path: 'users', label: 'My Users', icon: Users },
   { path: 'day-tours', label: 'Day Tours', icon: Calendar },
   { path: 'templates', label: 'Templates', icon: FileText },
+  { path: 'plans', label: 'User Plans', icon: Clipboard },
 ];
 
 export default function AgentLayout() {
@@ -127,6 +129,7 @@ export default function AgentLayout() {
             <Route path="users" element={<UsersPage />} />
             <Route path="day-tours" element={<DayToursPage />} />
             <Route path="templates" element={<TemplatesPage />} />
+            <Route path="plans" element={<UserPlansPage />} />
             <Route path="*" element={<Navigate to="/agent" replace />} />
           </Routes>
         </div>

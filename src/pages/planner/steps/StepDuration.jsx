@@ -1,13 +1,17 @@
 import { motion } from 'framer-motion';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { CalendarRange, ArrowLeft, ArrowRight, Train } from 'lucide-react';
+import { CalendarRange, ArrowLeft, ArrowRight, Train, Loader2, PackageX } from 'lucide-react';
 import usePlannerStore from '../../../store/plannerStore';
 import StepHeader from '../../../components/planner/StepHeader';
 import CustomSelect from '../../../components/planner/CustomSelect';
 
 export default function StepDuration() {
-  const { totalDays, setTotalDays, startDate, setStartDate, selectedCountry } = usePlannerStore();
+  const {
+    totalDays, setTotalDays, startDate, setStartDate, selectedCountry,
+    availableDays, availableDaysLoading,
+  } = usePlannerStore();
+
   return (
     <div className="space-y-8">
       <StepHeader icon={CalendarRange} title="When & How Long?" desc="Pick your start date and duration" />
@@ -15,23 +19,55 @@ export default function StepDuration() {
         {/* LEFT: TRIP DURATION */}
         <div className="flex-[1.8] space-y-4 order-last md:order-first">
           <label className="block text-sm font-bold text-ink/70 dark:text-white/70">Trip Duration</label>
-          <div className="flex flex-wrap gap-3">
-            {[3, 4, 5, 6, 7, 8, 9, 10, 12, 14].map(d => (
-              <motion.button key={d} onClick={() => setTotalDays(d)}
-                whileHover={{ y: -2, scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className={`py-3 px-5 min-w-[5rem] flex flex-col items-center justify-center rounded-[1.25rem] transition-all cursor-pointer border shadow-sm
-                  ${totalDays === d
-                    ? 'bg-gradient-to-br from-brand to-purple-600 text-white border-white/20 shadow-[0_8px_25px_rgba(79,70,229,0.35)] z-10'
-                    : 'bg-white/80 dark:bg-d-card/80 backdrop-blur-md border-ink/[0.04] dark:border-white/[0.04] text-ink/70 dark:text-white/70 hover:bg-white dark:hover:bg-d-card hover:border-brand/30 hover:shadow-md'
-                  }`}>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-black tracking-tight">{d}</span>
-                  <span className={`text-[10px] uppercase tracking-widest font-bold ${totalDays === d ? 'opacity-90' : 'opacity-60'}`}>days</span>
-                </div>
-              </motion.button>
-            ))}
-          </div>
+
+          {/* Loading state */}
+          {availableDaysLoading && (
+            <div className="flex items-center gap-3 py-8">
+              <Loader2 className="w-5 h-5 text-brand animate-spin" />
+              <span className="text-sm font-medium text-ink/50 dark:text-white/40">Loading available plans…</span>
+            </div>
+          )}
+
+          {/* No plans available */}
+          {!availableDaysLoading && availableDays.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col items-center justify-center py-10 rounded-[2rem] bg-white/60 dark:bg-d-card/60 border border-ink/[0.06] dark:border-white/[0.06]"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-warning/10 flex items-center justify-center mb-3">
+                <PackageX className="w-7 h-7 text-warning" />
+              </div>
+              <p className="text-sm font-bold text-ink/60 dark:text-white/50">No itinerary plans available</p>
+              <p className="text-xs text-ink/40 dark:text-white/30 mt-1">Try selecting a different country</p>
+            </motion.div>
+          )}
+
+          {/* Available day buttons */}
+          {!availableDaysLoading && availableDays.length > 0 && (
+            <>
+              <p className="text-xs text-ink/40 dark:text-white/30 font-medium -mt-2">
+                Showing durations with available itinerary plans
+              </p>
+              <div className="flex flex-wrap gap-3">
+                {availableDays.map(d => (
+                  <motion.button key={d} onClick={() => setTotalDays(d)}
+                    whileHover={{ y: -2, scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className={`py-3 px-5 min-w-[5rem] flex flex-col items-center justify-center rounded-[1.25rem] transition-all cursor-pointer border shadow-sm
+                      ${totalDays === d
+                        ? 'bg-gradient-to-br from-brand to-purple-600 text-white border-white/20 shadow-[0_8px_25px_rgba(79,70,229,0.35)] z-10'
+                        : 'bg-white/80 dark:bg-d-card/80 backdrop-blur-md border-ink/[0.04] dark:border-white/[0.04] text-ink/70 dark:text-white/70 hover:bg-white dark:hover:bg-d-card hover:border-brand/30 hover:shadow-md'
+                      }`}>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-black tracking-tight">{d}</span>
+                      <span className={`text-[10px] uppercase tracking-widest font-bold ${totalDays === d ? 'opacity-90' : 'opacity-60'}`}>days</span>
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* RIGHT: START DATE (CALENDAR) */}
@@ -40,7 +76,16 @@ export default function StepDuration() {
           <div className="bg-white/80 dark:bg-d-card/80 backdrop-blur-md rounded-[2rem] border border-ink/[0.04] dark:border-white/[0.04] p-4 lg:p-5 shadow-sm inline-block w-full sm:w-auto">
             <DatePicker
               selected={startDate ? new Date(startDate) : null}
-              onChange={(date) => setStartDate(date ? date.toISOString().split('T')[0] : '')}
+              onChange={(date) => {
+                if (date) {
+                  const y = date.getFullYear();
+                  const m = String(date.getMonth() + 1).padStart(2, '0');
+                  const d = String(date.getDate()).padStart(2, '0');
+                  setStartDate(`${y}-${m}-${d}`);
+                } else {
+                  setStartDate('');
+                }
+              }}
               dateFormat="dd MMM yyyy"
               minDate={new Date()}
               inline

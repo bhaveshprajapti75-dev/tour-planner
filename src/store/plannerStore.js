@@ -18,9 +18,11 @@ const usePlannerStore = create(
       travelType: null, // GROUP, SOLO, COUPLE
 
       // === STEP 3: Duration + Date ===
-      totalDays: 7,
-      totalNights: 6,
+      totalDays: 0,
+      totalNights: 0,
       startDate: null,
+      availableDays: [],      // durations that actually have templates
+      availableDaysLoading: false,
 
       // === STEP 2: Regions/Cities ===
       regions: [],
@@ -72,18 +74,54 @@ const usePlannerStore = create(
         }
       },
 
-      setSelectedCountry: (country) => set({
-        selectedCountry: country,
-        regions: [],
-        selectedRegions: [],
-        templates: [],
-        selectedTemplate: null,
-        dayTourDetails: {},
-        inclusionsData: null,
-        itinerary: [],
-      }),
+      setSelectedCountry: (country) => {
+        set({
+          selectedCountry: country,
+          regions: [],
+          selectedRegions: [],
+          templates: [],
+          selectedTemplate: null,
+          dayTourDetails: {},
+          inclusionsData: null,
+          itinerary: [],
+          availableDays: [],
+          totalDays: 0,
+          totalNights: 0,
+        });
+        // Auto-fetch available durations for this country
+        if (country) {
+          get().fetchAvailableDays(country.id);
+        }
+      },
 
-      setTravelType: (type) => set({ travelType: type }),
+      fetchAvailableDays: async (countryId) => {
+        set({ availableDaysLoading: true });
+        try {
+          const { travelType } = get();
+          const params = { country: countryId };
+          if (travelType) params.travel_type = travelType;
+          const { data } = await templatesAPI.getAvailableDays(params);
+          const daysSet = data.days || [];
+          const firstDay = daysSet[0] || 0;
+          set({
+            availableDays: daysSet,
+            availableDaysLoading: false,
+            totalDays: firstDay,
+            totalNights: Math.max(firstDay - 1, 0),
+          });
+        } catch {
+          set({ availableDaysLoading: false });
+        }
+      },
+
+      setTravelType: (type) => {
+        set({ travelType: type, availableDays: [], totalDays: 0, totalNights: 0 });
+        // Re-fetch available days for the new travel type
+        const { selectedCountry } = get();
+        if (selectedCountry) {
+          get().fetchAvailableDays(selectedCountry.id);
+        }
+      },
       setTotalDays: (days) => set({ totalDays: days, totalNights: Math.max(days - 1, 1) }),
       setStartDate: (date) => set({ startDate: date }),
 
@@ -111,11 +149,10 @@ const usePlannerStore = create(
       fetchTemplates: async (countryId, totalDays) => {
         set({ templatesLoading: true });
         try {
-          const { data } = await templatesAPI.getTemplates({
-            country: countryId,
-            total_days: totalDays,
-            page_size: 50,
-          });
+          const { travelType } = get();
+          const params = { country: countryId, total_days: totalDays, page_size: 50 };
+          if (travelType) params.travel_type = travelType;
+          const { data } = await templatesAPI.getTemplates(params);
           set({ templates: data.results || [], templatesLoading: false });
         } catch {
           set({ templatesLoading: false });
@@ -188,7 +225,22 @@ const usePlannerStore = create(
         if (!selectedTemplate) return;
 
         const days = [...(selectedTemplate.days || [])].sort((a, b) => a.day_number - b.day_number);
-        const baseDate = startDate ? new Date(startDate) : new Date();
+
+        // Parse startDate using local date parts to avoid timezone shift
+        let baseDate;
+        if (startDate) {
+          const [y, m, d] = startDate.split('-').map(Number);
+          baseDate = new Date(y, m - 1, d);
+        } else {
+          baseDate = new Date();
+        }
+
+        const formatDate = (dt) => {
+          const dd = String(dt.getDate()).padStart(2, '0');
+          const mm = String(dt.getMonth() + 1).padStart(2, '0');
+          const yyyy = dt.getFullYear();
+          return `${dd}/${mm}/${yyyy}`;
+        };
 
         const itinerary = days.map((d) => {
           const date = new Date(baseDate);
@@ -198,7 +250,7 @@ const usePlannerStore = create(
 
           return {
             dayNumber: d.day_number,
-            date: date.toISOString().split('T')[0],
+            date: formatDate(date),
             isArrival: d.is_arrival_day,
             isDeparture: d.is_departure_day,
             dayTourId: d.day_tour,
@@ -310,9 +362,10 @@ const usePlannerStore = create(
         currentStep: 1,
         selectedCountry: null,
         travelType: null,
-        totalDays: 7,
-        totalNights: 6,
+        totalDays: 0,
+        totalNights: 0,
         startDate: null,
+        availableDays: [],
         regions: [],
         selectedRegions: [],
         templates: [],
@@ -336,6 +389,7 @@ const usePlannerStore = create(
         startDate: state.startDate,
         selectedRegions: state.selectedRegions,
         selectedTemplate: state.selectedTemplate,
+        savedPlan: state.savedPlan,
       }),
     }
   )

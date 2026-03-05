@@ -124,6 +124,7 @@ export const inclusionsAPI = {
 
 // ==================== ITINERARY TEMPLATES ====================
 export const templatesAPI = {
+  getAvailableDays: (params) => api.get('/itinerary-templates/templates/available_days/', { params }),
   getTemplates: (params) => api.get('/itinerary-templates/templates/', { params }),
   getTemplate: (id) => api.get(`/itinerary-templates/templates/${id}/`),
   createTemplate: (data) => api.post('/itinerary-templates/templates/', data),

@@ -100,15 +100,6 @@ export default function HistoryPage() {
                       <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {plan.total_days}D / {plan.total_nights}N</span>
                       {plan.country_name && <><span>•</span><span>{plan.country_name}</span></>}
                       {plan.start_date && <><span>•</span><span className="flex items-center gap-1"><CalendarDays className="w-3.5 h-3.5" /> {plan.start_date}</span></>}
-                      <span>•</span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${
-                        plan.status === 'CONFIRMED' ? 'bg-accent/10 text-accent' :
-                        plan.status === 'DRAFT' ? 'bg-warning/10 text-warning' :
-                        plan.status === 'SHARED' ? 'bg-blue-100 text-blue-600' :
-                        'bg-gray-100 text-ink-light'
-                      }`}>
-                        {plan.status}
-                      </span>
                     </div>
                   </div>
                 </div>

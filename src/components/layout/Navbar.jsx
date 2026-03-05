@@ -1,15 +1,21 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Compass, User, Menu, X, History, LogOut, LayoutDashboard, Sun, Moon, Briefcase } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import useAuthStore from '../../store/authStore';
 import useThemeStore from '../../store/themeStore';
+import usePlannerStore from '../../store/plannerStore';
 
 export default function Navbar() {
     const { isAuthenticated, user, logout: authLogout, isAdmin, isAgent } = useAuthStore();
     const { theme, toggleTheme } = useThemeStore();
+    const { currentStep } = usePlannerStore();
     const navigate = useNavigate();
+    const location = useLocation();
     const [mobileOpen, setMobileOpen] = useState(false);
+
+    const isWizard = location.pathname.includes('/planner/wizard');
+    const TOTAL_STEPS = 5;
 
     const handleLogout = async () => {
         await authLogout();
@@ -27,7 +33,18 @@ export default function Navbar() {
     return (
         <nav className="fixed w-full z-50 top-0 pt-4 px-4 sm:px-6 lg:px-12 transition-all duration-300 pointer-events-none">
             <div className="max-w-[1400px] mx-auto pointer-events-auto">
-                <div className="glass rounded-[2rem] px-6 lg:px-8 py-4 flex justify-between items-center shadow-sm">
+                <div className="glass rounded-[2rem] px-6 lg:px-8 py-4 flex justify-between items-center shadow-sm relative overflow-hidden">
+
+                    {/* Progress bar for wizard */}
+                    {isWizard && (
+                        <div className="absolute bottom-0 left-0 w-full h-1 bg-ink/[0.06] dark:bg-white/[0.06]">
+                            <motion.div
+                                className="h-full bg-gradient-to-r from-brand via-purple-500 to-blue-500 rounded-r-full"
+                                animate={{ width: `${(currentStep / TOTAL_STEPS) * 100}%` }}
+                                transition={{ duration: 0.5, ease: 'easeOut' }}
+                            />
+                        </div>
+                    )}
 
                     {/* Logo */}
                     <Link to="/" className="flex items-center gap-3 group cursor-pointer">

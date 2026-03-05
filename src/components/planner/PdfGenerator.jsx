@@ -51,7 +51,7 @@ function TourPdf({ data }) {
           <View style={s.row}><Text style={s.label}>Duration</Text><Text style={s.value}>{totalDays} Days / {totalNights} Nights</Text></View>
           <View style={s.row}><Text style={s.label}>Travel Type</Text><Text style={s.value}>{travelType || 'N/A'}</Text></View>
           {templateName && <View style={s.row}><Text style={s.label}>Template</Text><Text style={s.value}>{templateName}</Text></View>}
-          {startDate && <View style={s.row}><Text style={s.label}>Start Date</Text><Text style={s.value}>{startDate}</Text></View>}
+          {startDate && <View style={s.row}><Text style={s.label}>Start Date</Text><Text style={s.value}>{startDate.split('-').reverse().join('/')}</Text></View>}
         </View>
 
         {/* Day-by-day */}
@@ -117,7 +117,7 @@ function TourPdf({ data }) {
         <View style={s.card}>
           {inclusions.length === 0 && <Text style={s.label}>No inclusions selected</Text>}
           {inclusions.map(item => (
-            <Text key={item.id} style={{ ...s.label, marginBottom: 3 }}>✓ {item.service}</Text>
+            <Text key={item.id} style={{ ...s.label, marginBottom: 3 }}>✓ {item.item_text}</Text>
           ))}
         </View>
 
@@ -126,7 +126,7 @@ function TourPdf({ data }) {
         <View style={s.card}>
           {exclusions.length === 0 && <Text style={s.label}>No exclusions noted</Text>}
           {exclusions.map(item => (
-            <Text key={item.id} style={{ ...s.label, marginBottom: 3 }}>✗ {item.service}</Text>
+            <Text key={item.id} style={{ ...s.label, marginBottom: 3 }}>✗ {item.item_text}</Text>
           ))}
         </View>
 
@@ -157,21 +157,10 @@ export default function PdfGenerator() {
 
   const generateAndDownload = useCallback(async () => {
     try {
-      // Build inclusion/exclusion lists from store
-      const inclusions = [];
-      const exclusions = [];
-      if (store.inclusionsData) {
-        for (const [type, groups] of Object.entries(store.inclusionsData)) {
-          for (const items of Object.values(groups)) {
-            for (const item of items) {
-              if (store.selectedInclusions.includes(item.id)) {
-                if (type === 'INCLUSION') inclusions.push(item);
-                else exclusions.push(item);
-              }
-            }
-          }
-        }
-      }
+      // Get inclusions/exclusions from template's own incl_excl data
+      const templateInclExcl = store.selectedTemplate?.incl_excl || [];
+      const inclusions = templateInclExcl.filter(ie => ie.type === 'INCLUSION');
+      const exclusions = templateInclExcl.filter(ie => ie.type === 'EXCLUSION');
 
       const data = {
         countryName: store.selectedCountry?.name || 'Tour',
@@ -207,6 +196,5 @@ export default function PdfGenerator() {
     return () => window.removeEventListener('download-pdf', handler);
   }, [generateAndDownload]);
 
-  // This component renders nothing - it just listens for download events
   return null;
 }

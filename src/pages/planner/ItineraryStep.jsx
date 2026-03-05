@@ -291,10 +291,12 @@ export default function ItineraryStep() {
               <Check className="w-4 h-4" /> Plan Created
             </span>
           )}
-          <button onClick={handleDownload}
-            className="flex items-center gap-2 bg-brand text-white px-6 py-3 rounded-2xl font-bold text-sm hover:bg-brand-hover shadow-lg shadow-brand/20 transition-all cursor-pointer">
-            <Download className="w-4 h-4" /> Download PDF
-          </button>
+          {savedPlan && (
+            <button onClick={handleDownload}
+              className="flex items-center gap-2 bg-brand text-white px-6 py-3 rounded-2xl font-bold text-sm hover:bg-brand-hover shadow-lg shadow-brand/20 transition-all cursor-pointer">
+              <Download className="w-4 h-4" /> Download PDF
+            </button>
+          )}
           <button onClick={() => { navigator.clipboard?.writeText(window.location.href); toast.success('Link copied!'); }}
             className="flex items-center gap-2 bg-canvas dark:bg-d-surface text-ink dark:text-white px-6 py-3 rounded-2xl font-bold text-sm border border-gray-200 dark:border-white/[0.08] hover:bg-gray-100 dark:hover:bg-white/10 transition-all cursor-pointer">
             <Share2 className="w-4 h-4" /> Share Plan

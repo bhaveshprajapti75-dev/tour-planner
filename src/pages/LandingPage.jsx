@@ -36,17 +36,17 @@ function Reveal({ children, className = '', delay = 0 }) {
 
 /* ─── "how it works" steps ──────────────────────────────────── */
 const steps = [
-  { num: '01', icon: MapPin, title: 'Pick Your Cities', desc: 'Choose from 6 hand-picked Swiss destinations — Zurich, Lucerne, Interlaken, Bern, Zermatt & Geneva.' },
-  { num: '02', icon: Hotel, title: 'Customize Everything', desc: 'Select hotels, sightseeing, activities, transport & meals per day. We handle all the details.' },
-  { num: '03', icon: FileText, title: 'Get Your Quotation', desc: 'Receive an instant line-by-line quotation and download a beautiful PDF itinerary.' },
+  { num: '01', icon: Globe, title: 'Choose Your Destination', desc: 'Pick a country, select your travel type, set your trip duration and preferred start date.' },
+  { num: '02', icon: MapPin, title: 'Select Regions & Template', desc: 'Choose the regions you want to explore and pick a ready-made itinerary template that fits your style.' },
+  { num: '03', icon: FileText, title: 'Get Your Itinerary', desc: 'View your day-by-day plan with inclusions, pricing breakdown and download a PDF instantly.' },
 ];
 
 /* ─── stats ─────────────────────────────────────────────────── */
 const stats = [
-  { value: '6', label: 'Swiss Cities', icon: Mountain },
-  { value: '50+', label: 'Activities', icon: Sparkles },
-  { value: '13', label: 'Premium Hotels', icon: Hotel },
-  { value: '3', label: 'Transport Tiers', icon: TrainFront },
+  { value: '10+', label: 'Countries', icon: Globe },
+  { value: '50+', label: 'Day Tours', icon: Sparkles },
+  { value: '20+', label: 'Regions', icon: Mountain },
+  { value: '100+', label: 'Templates', icon: FileText },
 ];
 
 /* ═══════════════════════════════════════════════════════════ */
@@ -96,7 +96,7 @@ export default function LandingPage() {
             transition={{ delay: 0.2 }}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/[0.08] backdrop-blur-2xl text-white/90 font-semibold text-sm tracking-wide mb-6 border border-white/[0.15] shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_4px_24px_rgba(0,0,0,0.2)]"
           >
-            <Compass className="w-4 h-4" /> Personalized Swiss Tour Planning
+            <Compass className="w-4 h-4" /> Personalized Tour Planning
           </motion.div>
 
           <motion.h1
@@ -107,7 +107,7 @@ export default function LandingPage() {
           >
             Design Your<br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 via-purple-200 to-indigo-300">
-              Swiss Adventure
+              Dream Adventure
             </span>
           </motion.h1>
 
@@ -117,8 +117,8 @@ export default function LandingPage() {
             transition={{ delay: 0.5 }}
             className="text-base sm:text-lg text-white/70 font-medium max-w-xl mx-auto mb-10 leading-relaxed"
           >
-            Build a day-by-day itinerary across Switzerland's finest destinations.
-            Choose cities, hotels, activities — and get an instant quotation.
+            Build a day-by-day itinerary for your perfect trip.
+            Choose your destination, pick a template — and get an instant plan.
           </motion.p>
 
           <motion.div
@@ -163,7 +163,7 @@ export default function LandingPage() {
         <Reveal className="text-center mb-16">
           <span className="inline-block text-brand font-bold text-sm tracking-widest uppercase mb-3">How It Works</span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-ink dark:text-white tracking-tight">
-            Plan in 3 simple steps
+            Plan in 3 easy steps
           </h2>
         </Reveal>
 
@@ -192,10 +192,10 @@ export default function LandingPage() {
         <Reveal className="text-center mb-16">
           <span className="inline-block text-brand font-bold text-sm tracking-widest uppercase mb-3">Destinations</span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-ink dark:text-white tracking-tight">
-            Explore Switzerland
+            Popular Destinations
           </h2>
           <p className="text-ink/40 dark:text-white/50 mt-4 max-w-lg mx-auto font-medium">
-            Six iconic cities, each with curated hotels, sightseeing & activities.
+            Explore stunning destinations with curated day tours & itinerary templates.
           </p>
         </Reveal>
 
@@ -248,12 +248,12 @@ export default function LandingPage() {
 
         <div className="max-w-5xl mx-auto grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {[
-            { icon: Shield, title: 'Transparent Pricing', desc: 'Line-by-line quotation — no hidden costs, ever.' },
-            { icon: Clock, title: 'Instant Itinerary', desc: 'Get a detailed day-by-day plan in under 2 minutes.' },
-            { icon: FileText, title: 'PDF Download', desc: 'Download a beautiful branded PDF for your records.' },
-            { icon: Star, title: 'Curated Experiences', desc: 'Handpicked activities, tours & sightseeing per city.' },
-            { icon: TrainFront, title: 'Flexible Transport', desc: 'Economy, Standard or Premium — pick your ride.' },
-            { icon: Globe, title: 'Multi-city Planning', desc: 'Combine cities freely and build your perfect route.' },
+            { icon: Shield, title: 'Transparent Pricing', desc: 'Clear cost breakdown for every day — no hidden charges.' },
+            { icon: Clock, title: 'Instant Itinerary', desc: 'Get a complete day-by-day plan ready in minutes.' },
+            { icon: FileText, title: 'PDF Download', desc: 'Download a professional PDF itinerary to share or print.' },
+            { icon: Star, title: 'Curated Templates', desc: 'Choose from ready-made itinerary templates for every style.' },
+            { icon: TrainFront, title: 'Inclusions & Exclusions', desc: "Know exactly what's included and what's not in your plan." },
+            { icon: Globe, title: 'Multi-country Planning', desc: 'Pick any country, select regions and plan your perfect trip.' },
           ].map((f, i) => (
             <Reveal key={f.title} delay={i * 0.08}>
               <div className="rounded-3xl p-7 h-full hover:border-brand/30 hover:-translate-y-1 transition-all duration-300 bg-white dark:bg-white/[0.06] backdrop-blur-2xl border border-gray-200 dark:border-white/[0.12] shadow-lg dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-xl dark:hover:bg-white/[0.1] dark:hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.15),0_12px_40px_rgba(0,0,0,0.35)]">
@@ -279,10 +279,10 @@ export default function LandingPage() {
         <Reveal className="relative z-10 text-center max-w-2xl mx-auto">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight mb-6 leading-tight">
             Ready to plan your <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 via-purple-200 to-indigo-300">dream Swiss trip?</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 via-purple-200 to-indigo-300">dream trip?</span>
           </h2>
           <p className="text-white/70 font-medium mb-10 text-lg">
-            Join hundreds of travellers who built their perfect itinerary with DigiWave.
+            Join travellers who built their perfect itinerary with DigiWave.
           </p>
           <button
             onClick={startFlow}
@@ -309,7 +309,7 @@ export default function LandingPage() {
               <span className="text-ink dark:text-white font-extrabold text-lg tracking-tight">DigiWave</span>
             </div>
             <p className="text-ink/40 dark:text-white/40 text-sm font-medium leading-relaxed">
-              Switzerland Tour Planning Management System. Build, customize & share your perfect itinerary.
+              Tour Planning Management System. Build, customize & share your perfect itinerary.
             </p>
           </div>
 
@@ -333,7 +333,7 @@ export default function LandingPage() {
 
           {/* destinations */}
           <div>
-            <h4 className="text-ink dark:text-white font-bold text-sm uppercase tracking-wider mb-4">Destinations</h4>
+            <h4 className="text-ink dark:text-white font-bold text-sm uppercase tracking-wider mb-4">Featured Places</h4>
             <ul className="space-y-2.5">
               {cities.slice(0, 5).map(c => (
                 <li key={c.id} className="text-ink/40 dark:text-white/50 text-sm font-medium">{c.name}</li>

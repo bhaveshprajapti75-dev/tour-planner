@@ -73,15 +73,6 @@ export default function PlannerWizard() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* Thin progress bar — always visible below navbar */}
-      <div className="shrink-0 w-full h-1 bg-ink/[0.06] dark:bg-white/[0.06]">
-        <motion.div
-          className="h-full bg-gradient-to-r from-brand via-purple-500 to-blue-500 rounded-r-full"
-          animate={{ width: `${(currentStep / TOTAL_STEPS) * 100}%` }}
-          transition={{ duration: 0.5, ease: 'easeOut' }}
-        />
-      </div>
-
       {/* Step Content — only this area scrolls */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
