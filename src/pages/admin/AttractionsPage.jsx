@@ -11,7 +11,7 @@ import {
 } from '../../components/admin';
 
 const DEFAULT_FORM = {
-  region: '', name: '', key_features_notes: '',
+  region: '', name: '', key_features_notes: '', source_citations: '',
   latitude: '', longitude: '', display_order: 0, is_active: true,
 };
 
@@ -70,11 +70,18 @@ export default function AttractionsPage() {
       ),
     },
     { key: 'region', label: 'Region', render: r => <span className="text-sm text-ink-light dark:text-white/50">{regionMap[r.region] || r.region}</span> },
-    {
-      key: 'images', label: 'Images', render: r => (
-        <span className="text-xs text-ink-light dark:text-white/50">{r.images?.length || 0} img</span>
-      ),
-    },
+    { key: 'images', label: 'Images', render: r => {
+      const imgs = r.images || [];
+      if (!imgs.length) return <span className="text-xs text-ink-light dark:text-white/50">-</span>;
+      return (
+        <div className="flex items-center -space-x-2">
+          {imgs.slice(0, 3).map((img, i) => (
+            <img key={img.id} src={img.image} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-white dark:border-d-card" style={{ zIndex: 3 - i }} />
+          ))}
+          {imgs.length > 3 && <span className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 border-2 border-white dark:border-d-card flex items-center justify-center text-[10px] font-bold text-ink-light dark:text-white/50">+{imgs.length - 3}</span>}
+        </div>
+      );
+    }},
     {
       key: 'coords', label: 'Coordinates', render: r => (
         <span className="text-xs text-ink-light dark:text-white/50 font-mono">
@@ -168,6 +175,7 @@ export default function AttractionsPage() {
           { label: 'Region', value: regionMap[viewing.region] || viewing.region },
           { label: 'Name', value: viewing.name, colSpan: 2 },
           { label: 'Key Features / Notes', value: viewing.key_features_notes, type: 'multiline', colSpan: 2 },
+          { label: 'Source Citations', value: viewing.source_citations, type: 'multiline', colSpan: 2 },
           { label: 'Location', value: viewing.latitude && viewing.longitude ? { lat: viewing.latitude, lng: viewing.longitude } : null, type: 'coords', colSpan: 2 },
           { label: 'Images', value: viewing.images?.length ? viewing.images : null, type: 'gallery', colSpan: 2 },
           { label: 'Display Order', value: viewing.display_order },
@@ -187,6 +195,7 @@ export default function AttractionsPage() {
               </div>
               <Input label="Name" value={form.name} onChange={e => { setForm(f => ({ ...f, name: e.target.value })); clearError('name'); }} required error={errors.name} />
               <Textarea label="Key Features / Notes" value={form.key_features_notes} onChange={e => setForm(f => ({ ...f, key_features_notes: e.target.value }))} rows={2} />
+              <Textarea label="Source Citations" value={form.source_citations} onChange={e => setForm(f => ({ ...f, source_citations: e.target.value }))} rows={2} />
               <ImageUpload
                 files={imageFiles}
                 onChange={setImageFiles}

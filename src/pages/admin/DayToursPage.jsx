@@ -30,9 +30,9 @@ const CURRENCY_OPTIONS = [
 
 const DEFAULT_FORM = {
   region: '', activity_combination: '', itinerary_text: '',
-  travel_type: '', validity_mode: '', valid_from: '', valid_to: '',
+  travel_type: 'GENERAL', validity_mode: 'OPEN', valid_from: '', valid_to: '',
   price: '', currency: 'INR',
-  est_time_distance: '', overnight_location: '',
+  est_time_distance: '', overnight_location: '', source_file: '',
   display_order: 0, is_active: true,
 };
 
@@ -135,6 +135,7 @@ export default function DayToursPage() {
           { label: 'Price', value: viewing.price ? `${viewing.currency} ${viewing.price}` : '-' },
           { label: 'Overnight Location', value: viewing.overnight_location || '-' },
           { label: 'Est. Time/Distance', value: viewing.est_time_distance || '-' },
+          { label: 'Source File', value: viewing.source_file || '-' },
           { label: 'Valid From', value: viewing.valid_from ? viewing.valid_from.split('-').reverse().join('/') : '-' },
           { label: 'Valid To', value: viewing.valid_to ? viewing.valid_to.split('-').reverse().join('/') : '-' },
           { label: 'Itinerary', value: viewing.itinerary_text, type: 'multiline', colSpan: 2 },
@@ -163,6 +164,7 @@ export default function DayToursPage() {
             <Select label="Validity Mode" value={form.validity_mode} onChange={val => setForm(f => ({ ...f, validity_mode: val, ...(val === 'OPEN' ? { valid_from: '', valid_to: '' } : {}) }))} options={VALIDITY_MODE_OPTIONS} placeholder="Select Mode" />
             <Input label="Est. Time/Distance" value={form.est_time_distance} onChange={e => setForm(f => ({ ...f, est_time_distance: e.target.value }))} />
           </div>
+          <Input label="Source File" value={form.source_file} onChange={e => setForm(f => ({ ...f, source_file: e.target.value }))} />
           {showDateFields && (
             <div className="grid grid-cols-2 gap-4">
               <DateInput label="Valid From" value={form.valid_from} onChange={e => setForm(f => ({ ...f, valid_from: e.target.value }))} />

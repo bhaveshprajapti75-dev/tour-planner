@@ -138,7 +138,7 @@ function ItemsView({ categories, countries }) {
 }
 
 // ─── Categories Tab ───────────────────────────────────────────────
-const CAT_FORM = { name: '', type: 'INCLUSION', description: '', is_active: true };
+const CAT_FORM = { name: '', display_order: 0, is_active: true };
 
 function CategoriesView() {
   const [viewing, setViewing] = useState(null);
@@ -153,13 +153,12 @@ function CategoriesView() {
 
   const columns = useMemo(() => [
     { key: 'name', label: 'Name', render: r => <button type="button" onClick={() => setViewing(r)} className="text-sm font-bold text-brand hover:underline cursor-pointer text-left">{r.name}</button> },
-    { key: 'type', label: 'Type', render: r => <Badge variant={r.type === 'INCLUSION' ? 'green' : 'red'}>{r.type}</Badge> },
+    { key: 'display_order', label: 'Order', render: r => <span className="text-sm text-ink-light dark:text-white/50">{r.display_order}</span> },
     { key: 'is_active', label: 'Status', render: r => <StatusToggle active={r.is_active} onChange={() => crud.toggleActive(r)} /> },
   ], []);
 
   const catRules = {
     name: v => !v?.trim() && 'Category name is required',
-    type: v => !v && 'Please select a type',
   };
 
   const onSubmit = e => {
@@ -196,18 +195,15 @@ function CategoriesView() {
         title={viewing?.name || 'Category Details'}
         fields={viewing ? [
           { label: 'Name', value: viewing.name, colSpan: 2 },
-          { label: 'Type', value: viewing.type, type: 'badge', variant: viewing.type === 'INCLUSION' ? 'green' : 'red' },
+          { label: 'Display Order', value: viewing.display_order },
           { label: 'Status', value: viewing.is_active, type: 'status' },
-          { label: 'Description', value: viewing.description, type: 'multiline', colSpan: 2 },
         ] : []}
       />
 
       <Modal open={crud.showModal} onClose={closeModal} title={crud.editing ? 'Edit Category' : 'Add Category'}>
         <form onSubmit={onSubmit} className="space-y-4">
           <Input label="Name" value={form.name} onChange={e => { setForm(f => ({ ...f, name: e.target.value })); clearError('name'); }} required error={errors.name} />
-          <Select label="Type" value={form.type} onChange={val => { setForm(f => ({ ...f, type: val })); clearError('type'); }} required
-            options={[{ value: 'INCLUSION', label: 'Inclusion' }, { value: 'EXCLUSION', label: 'Exclusion' }]} error={errors.type} />
-          <Textarea label="Description" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} />
+          <Input label="Display Order" type="number" value={form.display_order} onChange={e => setForm(f => ({ ...f, display_order: parseInt(e.target.value) || 0 }))} />
           <ToggleSwitch label="Active" checked={form.is_active} onChange={val => setForm(f => ({ ...f, is_active: val }))} />
           <ModalActions onCancel={closeModal} saving={crud.saving} isEdit={!!crud.editing} />
         </form>

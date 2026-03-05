@@ -12,7 +12,7 @@ import {
 
 const DEFAULT_FORM = {
   country: '', name: '', total_nights: 0, total_days: 1,
-  description: '', is_active: true,
+  description: '', is_default: false, is_active: true,
 };
 
 export default function TemplatesPage() {
@@ -110,6 +110,7 @@ export default function TemplatesPage() {
         <Badge variant="brand">{r.total_days}D / {r.total_nights}N</Badge>
       ),
     },
+    { key: 'is_default', label: 'Default', render: r => r.is_default ? <Badge variant="blue">Default</Badge> : <span className="text-xs text-ink-light dark:text-white/50">-</span> },
     { key: 'status', label: 'Status', render: r => <StatusToggle active={r.is_active} onChange={() => crud.toggleActive(r)} /> },
   ], [countryMap]);
 
@@ -155,6 +156,7 @@ export default function TemplatesPage() {
           { label: 'Code', value: viewing.code },
           { label: 'Country', value: countryMap[viewing.country] || viewing.country },
           { label: 'Duration', value: `${viewing.total_days} Days / ${viewing.total_nights} Nights`, type: 'badge', variant: 'brand' },
+          { label: 'Default Template', value: viewing.is_default, type: 'status' },
           { label: 'Status', value: viewing.is_active, type: 'status' },
           { label: 'Description', value: viewing.description, type: 'multiline', colSpan: 2 },
         ] : []}
@@ -171,7 +173,10 @@ export default function TemplatesPage() {
             <ReadOnlyInput label="Days" value={form.total_days} />
           </div>
           <Textarea label="Description" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} />
-          <ToggleSwitch label="Active" checked={form.is_active} onChange={val => setForm(f => ({ ...f, is_active: val }))} />
+          <div className="flex gap-6">
+            <ToggleSwitch label="Default Template" checked={form.is_default} onChange={val => setForm(f => ({ ...f, is_default: val }))} />
+            <ToggleSwitch label="Active" checked={form.is_active} onChange={val => setForm(f => ({ ...f, is_active: val }))} />
+          </div>
           <ModalActions onCancel={closeModal} saving={crud.saving} isEdit={!!crud.editing} />
         </form>
       </Modal>

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE = '/api/v1';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -46,15 +46,23 @@ export const geographyAPI = {
   // Countries
   getCountries: (params) => api.get('/geography/countries/', { params }),
   getCountry: (id) => api.get(`/geography/countries/${id}/`),
-  createCountry: (data) => api.post('/geography/countries/', data),
-  updateCountry: (id, data) => api.patch(`/geography/countries/${id}/`, data),
+  createCountry: (data) => api.post('/geography/countries/', data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  updateCountry: (id, data) => api.patch(`/geography/countries/${id}/`, data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
   deleteCountry: (id) => api.delete(`/geography/countries/${id}/`),
 
   // Regions
   getRegions: (params) => api.get('/geography/regions/', { params }),
   getRegion: (id) => api.get(`/geography/regions/${id}/`),
-  createRegion: (data) => api.post('/geography/regions/', data),
-  updateRegion: (id, data) => api.patch(`/geography/regions/${id}/`, data),
+  createRegion: (data) => api.post('/geography/regions/', data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  updateRegion: (id, data) => api.patch(`/geography/regions/${id}/`, data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
   deleteRegion: (id) => api.delete(`/geography/regions/${id}/`),
 };
 
