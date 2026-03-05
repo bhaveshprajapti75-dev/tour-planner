@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { PlusCircle, Trash2, ListChecks, Check } from 'lucide-react';
 import { templatesAPI, geographyAPI, dayToursAPI, inclusionsAPI } from '../../services/api';
 import useCrudPage from '../../hooks/useCrudPage';
@@ -56,7 +56,10 @@ export default function TemplatesPage() {
   const [inclTemplate, setInclTemplate] = useState(null);
   const [countryInclusions, setCountryInclusions] = useState([]);
   const [attachedIds, setAttachedIds] = useState(new Set());
+  const [originalAttachedIds, setOriginalAttachedIds] = useState(new Set());
   const [inclLoading, setInclLoading] = useState(false);
+  const [inclSaving, setInclSaving] = useState(false);
+  const savingRef = useRef(false);
 
   const templateRules = {
     country: v => !v && 'Please select a country',
@@ -65,21 +68,29 @@ export default function TemplatesPage() {
   };
 
   const dayRules = {
-    day_number: v => (!v || v < 1) && 'Day number is required',
+    day_number: v => {
+      if (v === '' || v === null || v === undefined) return 'Day number is required';
+      const n = Number(v);
+      if (isNaN(n) || n < 1) return 'Must be at least 1';
+    },
     day_tour: v => !v && 'Please select a day tour',
   };
 
   const loadDays = async (tplId) => {
     try {
       const { data } = await templatesAPI.getDays({ template: tplId });
-      setTemplateDays(data.results || data);
-    } catch { /* ignore */ }
+      const days = data.results || data;
+      setTemplateDays(days);
+      return days;
+    } catch { return []; }
   };
 
   const openDays = (t) => {
     setSelectedTemplate(t);
-    loadDays(t.id);
-    setDayForm({ day_number: 1, day_tour: dayTourOpts[0]?.value || '', is_arrival_day: false, is_departure_day: false });
+    loadDays(t.id).then(days => {
+      const maxDay = days && days.length > 0 ? Math.max(...days.map(d => d.day_number)) : 0;
+      setDayForm({ day_number: Math.min(maxDay + 1, t.total_days), day_tour: dayTourOpts[0]?.value || '', is_arrival_day: false, is_departure_day: false });
+    });
     setShowDayModal(true);
   };
 
@@ -88,13 +99,32 @@ export default function TemplatesPage() {
     if (!validateDay(dayForm, dayRules)) return;
     setSavingDay(true);
     try {
-      await templatesAPI.addDay(selectedTemplate.id, dayForm);
+      const payload = {
+        ...dayForm,
+        day_number: Number(dayForm.day_number),
+        day_tour: Number(dayForm.day_tour),
+      };
+      await templatesAPI.addDay(selectedTemplate.id, payload);
       toast.success('Day added');
-      loadDays(selectedTemplate.id);
-      setDayForm(f => ({ ...f, day_number: f.day_number + 1 }));
+      clearDayErrors();
+      const days = await loadDays(selectedTemplate.id);
+      const maxDay = days.length > 0 ? Math.max(...days.map(d => d.day_number)) : 0;
+      setDayForm(f => ({ ...f, day_number: Math.min(maxDay + 1, selectedTemplate.total_days) }));
     } catch (err) {
-      const msg = err.response?.data;
-      toast.error(typeof msg === 'object' ? Object.values(msg).flat().join(', ') : 'Add day failed');
+      const data = err.response?.data;
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        // Show field-level errors below inputs via validateDay
+        const rules = {};
+        for (const [key, val] of Object.entries(data)) {
+          const msg = Array.isArray(val) ? val[0] : val;
+          rules[key] = () => msg;
+        }
+        validateDay(dayForm, rules);
+        // Show non-field errors as toast
+        if (data.non_field_errors) toast.error(Array.isArray(data.non_field_errors) ? data.non_field_errors[0] : data.non_field_errors);
+      } else {
+        toast.error(typeof data === 'string' ? data : 'Add day failed');
+      }
     } finally {
       setSavingDay(false);
     }
@@ -104,8 +134,13 @@ export default function TemplatesPage() {
     try {
       await templatesAPI.deleteDay(dayId);
       toast.success('Day removed');
-      loadDays(selectedTemplate.id);
-    } catch { toast.error('Failed to remove day'); }
+      const days = await loadDays(selectedTemplate.id);
+      const maxDay = days.length > 0 ? Math.max(...days.map(d => d.day_number)) : 0;
+      setDayForm(f => ({ ...f, day_number: Math.min(maxDay + 1, selectedTemplate.total_days) }));
+    } catch (err) {
+      const msg = err.response?.data;
+      toast.error(typeof msg === 'string' ? msg : 'Failed to remove day');
+    }
   };
 
   const openInclusions = async (tpl) => {
@@ -118,22 +153,63 @@ export default function TemplatesPage() {
       setCountryInclusions(items);
       const linked = new Set((tpl.incl_excl || []).map(ie => ie.incl_excl));
       setAttachedIds(linked);
+      setOriginalAttachedIds(linked);
     } catch { toast.error('Failed to load inclusions'); }
     finally { setInclLoading(false); }
   };
 
-  const toggleAttach = async (itemId) => {
-    if (!inclTemplate) return;
-    const isAttached = attachedIds.has(itemId);
+  const toggleAttach = (itemId) => {
+    setAttachedIds(prev => {
+      const n = new Set(prev);
+      if (n.has(itemId)) n.delete(itemId); else n.add(itemId);
+      return n;
+    });
+  };
+
+  const inclHasChanges = useMemo(() => {
+    if (attachedIds.size !== originalAttachedIds.size) return true;
+    for (const id of attachedIds) { if (!originalAttachedIds.has(id)) return true; }
+    return false;
+  }, [attachedIds, originalAttachedIds]);
+
+  const saveInclusions = async () => {
+    if (!inclTemplate || inclSaving || savingRef.current) return;
+    
+    savingRef.current = true;
+    setInclSaving(true);
+    
     try {
-      if (isAttached) {
-        await templatesAPI.removeInclusion(inclTemplate.id, { incl_excl: itemId });
-        setAttachedIds(prev => { const n = new Set(prev); n.delete(itemId); return n; });
-      } else {
-        await templatesAPI.attachInclusion(inclTemplate.id, { incl_excl: itemId });
-        setAttachedIds(prev => new Set(prev).add(itemId));
+      const toAttach = [...attachedIds].filter(id => !originalAttachedIds.has(id));
+      const toRemove = [...originalAttachedIds].filter(id => !attachedIds.has(id));
+      
+      if (toAttach.length === 0 && toRemove.length === 0) {
+        return;
       }
-    } catch { toast.error('Failed to update'); }
+      
+      const results = await Promise.allSettled([
+        ...toAttach.map(id => templatesAPI.attachInclusion(inclTemplate.id, { incl_excl: id })),
+        ...toRemove.map(id => templatesAPI.removeInclusion(inclTemplate.id, { incl_excl: id })),
+      ]);
+
+      const failures = results.filter(r => r.status === 'rejected');
+      
+      if (failures.length === 0) {
+        setOriginalAttachedIds(new Set(attachedIds));
+        toast.success('Inclusions updated successfully');
+      } else if (failures.length === results.length) {
+        toast.error('Failed to save inclusions');
+      } else {
+        setOriginalAttachedIds(new Set(attachedIds));
+        toast.success(`Saved with ${failures.length} warning(s)`);
+      }
+      // Refresh table data silently
+      try { await crud.load(); } catch { /* ignore refresh errors */ }
+    } catch {
+      toast.error('Failed to save inclusions');
+    } finally {
+      setInclSaving(false);
+      savingRef.current = false;
+    }
   };
 
   const columns = useMemo(() => [
@@ -259,7 +335,7 @@ export default function TemplatesPage() {
               <h4 className="text-sm font-bold text-ink dark:text-white">Add Day</h4>
               <div className="grid grid-cols-2 gap-4">
                 <Input label="Day Number" type="number" min={1} max={selectedTemplate.total_days} value={dayForm.day_number}
-                  onChange={e => { setDayForm(f => ({ ...f, day_number: parseInt(e.target.value) || 1 })); clearDayError('day_number'); }} required error={dayErrors.day_number} />
+                  onChange={e => { setDayForm(f => ({ ...f, day_number: e.target.value })); clearDayError('day_number'); }} required error={dayErrors.day_number} />
                 <Select label="Day Tour" value={dayForm.day_tour} onChange={val => { setDayForm(f => ({ ...f, day_tour: val })); clearDayError('day_tour'); }} required
                   options={dayTourOpts} placeholder="Select Tour" searchable error={dayErrors.day_tour} />
               </div>
@@ -327,10 +403,21 @@ export default function TemplatesPage() {
                 })}
               </div>
             )}
-            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/[0.08]">
+            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/[0.08] flex items-center justify-between">
               <p className="text-xs text-ink-light dark:text-white/40">
                 <strong>{attachedIds.size}</strong> item{attachedIds.size !== 1 ? 's' : ''} attached to this template
               </p>
+              <button
+                type="button"
+                onClick={saveInclusions}
+                disabled={!inclHasChanges || inclSaving}
+                className={`px-5 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer
+                  ${inclHasChanges
+                    ? 'bg-brand text-white hover:bg-brand-hover shadow-md shadow-brand/20'
+                    : 'bg-gray-100 dark:bg-white/10 text-ink-light dark:text-white/30 cursor-not-allowed'}`}
+              >
+                {inclSaving ? 'Saving...' : 'Save Changes'}
+              </button>
             </div>
           </>
         )}
