@@ -22,7 +22,7 @@ export default function PlannerPage() {
                 <div className="flex-1 max-w-4xl pr-2">
                   <ItineraryStep />
                 </div>
-                <div className="hidden lg:block w-[380px] sticky top-0">
+                <div className="hidden lg:block w-[380px] sticky top-24">
                   <SidebarQuotation />
                 </div>
               </div>

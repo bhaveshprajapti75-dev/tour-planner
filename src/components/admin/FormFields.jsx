@@ -6,10 +6,9 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, Check, Clock, AlertCircle, CalendarDays } from 'lucide-react';
 
 const baseInputClass = (hasError) =>
-  `w-full px-4 py-3 bg-canvas dark:bg-d-surface border rounded-xl text-sm font-medium text-ink dark:text-white focus:outline-none transition-all ${
-    hasError
-      ? 'border-red-400 dark:border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/10'
-      : 'border-gray-200 dark:border-white/[0.08] focus:border-brand focus:ring-2 focus:ring-brand/10'
+  `w-full px-4 py-3 bg-canvas dark:bg-d-surface border rounded-xl text-sm font-medium text-ink dark:text-white focus:outline-none transition-all ${hasError
+    ? 'border-red-400 dark:border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/10'
+    : 'border-gray-200 dark:border-white/[0.08] focus:border-brand focus:ring-2 focus:ring-brand/10'
   }`;
 
 const labelClass = 'block text-sm font-bold text-ink dark:text-white mb-1.5';
@@ -128,9 +127,8 @@ export function Select({
       </button>
 
       {open && (
-        <div className={`absolute z-50 w-full bg-white dark:bg-d-card border border-gray-200 dark:border-white/[0.08] rounded-xl shadow-xl shadow-black/10 dark:shadow-black/30 overflow-hidden animate-in fade-in duration-150 ${
-          openUp ? 'bottom-full mb-1.5 slide-in-from-bottom-1' : 'mt-1.5 slide-in-from-top-1'
-        }`}>
+        <div className={`absolute z-50 w-full bg-white dark:bg-d-card border border-gray-200 dark:border-white/[0.08] rounded-xl shadow-xl shadow-black/10 dark:shadow-black/30 overflow-hidden animate-in fade-in duration-150 ${openUp ? 'bottom-full mb-1.5 slide-in-from-bottom-1' : 'mt-1.5 slide-in-from-top-1'
+          }`}>
           {searchable && (
             <div className="p-2 border-b border-gray-100 dark:border-white/[0.08]">
               <input ref={inputRef} type="text" value={query} onChange={e => setQuery(e.target.value)}
@@ -310,8 +308,8 @@ export function ReadOnlyInput({ label, value, className }) {
 }
 
 // ─── DateInput (dd/mm/yyyy custom calendar picker) ────────────────
-const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-const DAY_LABELS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
 function toDisplay(isoStr) {
   if (!isoStr) return '';
@@ -510,6 +508,158 @@ export function DateInput({ label, required, error, value, onChange, className, 
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Custom MultiSelect dropdown that displays selected items as chips/pills.
+ *
+ * @param {Array}    value         - Array of selected values, e.g., [1, 2, 3]
+ * @param {Function} onChange      - (values: Array) => void
+ * @param {Array}    options       - [{ value, label }]
+ * @param {string}   [placeholder] - text when nothing selected
+ * @param {boolean}  [searchable]  - enable type-ahead search within options
+ */
+export function MultiSelect({
+  label, required, error, options = [], placeholder = 'Select items...', searchable = false, className, value = [], onChange,
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [openUp, setOpenUp] = useState(false);
+  const containerRef = useRef(null);
+  const triggerRef = useRef(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false);
+        setQuery('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  useEffect(() => {
+    if (open && searchable && inputRef.current) inputRef.current.focus();
+  }, [open, searchable]);
+
+  const filtered = searchable && query
+    ? options.filter(o => o.label.toLowerCase().includes(query.toLowerCase()))
+    : options;
+
+  const handleToggle = () => {
+    if (!open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      setOpenUp(spaceBelow < 280);
+    }
+    setOpen(!open);
+  };
+
+  const toggleOption = (optValue, e) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    const currentStr = value.map(String);
+    const valStr = String(optValue);
+
+    if (currentStr.includes(valStr)) {
+      onChange?.(value.filter(v => String(v) !== valStr));
+    } else {
+      onChange?.([...value, optValue]);
+    }
+  };
+
+  const removeOption = (optValue, e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onChange?.(value.filter(v => String(v) !== String(optValue)));
+  };
+
+  return (
+    <div className={`relative ${className || ''}`} ref={containerRef}>
+      {label && (
+        <label className={labelClass}>
+          {label} {required && <span className="text-red-400">*</span>}
+        </label>
+      )}
+
+      <button
+        type="button"
+        ref={triggerRef}
+        onClick={handleToggle}
+        className={`w-full flex items-center justify-between min-h-[46px] px-2 py-1.5 bg-canvas dark:bg-d-surface border rounded-xl transition-all cursor-pointer text-left
+          ${open ? 'border-brand ring-2 ring-brand/10' : !!error ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-white/[0.08] hover:border-gray-300 dark:hover:border-white/[0.15]'}`}
+      >
+        <div className="flex flex-wrap gap-1.5 items-center w-full pr-6">
+          {(!value || value.length === 0) ? (
+            <span className="text-gray-400 dark:text-white/40 text-sm px-2 py-1 block">
+              {placeholder}
+            </span>
+          ) : (
+            value.map(val => {
+              const opt = options.find(o => String(o.value) === String(val));
+              if (!opt) return null;
+              return (
+                <span
+                  key={opt.value}
+                  className="flex items-center gap-1.5 px-2.5 py-1 bg-brand/10 dark:bg-brand/20 text-brand text-xs font-bold rounded-lg"
+                >
+                  <span className="truncate max-w-[150px]">{opt.label}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => removeOption(opt.value, e)}
+                    className="p-0.5 hover:bg-brand/20 text-brand rounded-full transition-colors cursor-pointer"
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })
+          )}
+        </div>
+        <ChevronDown className={`absolute right-4 w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className={`absolute z-50 w-full bg-white dark:bg-d-card border border-gray-200 dark:border-white/[0.08] rounded-xl shadow-xl shadow-black/10 dark:shadow-black/30 overflow-hidden animate-in fade-in duration-150 ${openUp ? 'bottom-full mb-1.5 slide-in-from-bottom-1' : 'mt-1.5 slide-in-from-top-1'
+          }`}>
+          {searchable && (
+            <div className="p-2 border-b border-gray-100 dark:border-white/[0.08]">
+              <input ref={inputRef} type="text" value={query} onChange={e => setQuery(e.target.value)}
+                placeholder="Search..." className="w-full px-3 py-2 bg-canvas dark:bg-d-surface border border-gray-200 dark:border-white/[0.08] rounded-lg text-sm text-ink dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-brand" />
+            </div>
+          )}
+          <div className="max-h-56 overflow-y-auto py-1 custom-scrollbar">
+            {filtered.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-gray-400 dark:text-white/40 text-center">No options found</div>
+            ) : (
+              filtered.map(opt => {
+                const isSelected = value.map(String).includes(String(opt.value));
+                return (
+                  <button key={opt.value} type="button" onClick={(e) => toggleOption(opt.value, e)}
+                    className={`w-full flex items-start gap-3 px-4 py-2.5 text-sm transition-colors cursor-pointer hover:bg-canvas dark:hover:bg-d-surface ${isSelected ? 'bg-brand/5' : ''
+                      }`}>
+                    <div className={`mt-0.5 shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-brand border-brand' : 'border-gray-300 dark:border-white/20'
+                      }`}>
+                      {isSelected && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                    <span className={`text-left font-medium ${isSelected ? 'text-brand' : 'text-ink dark:text-white'}`}>
+                      {opt.label}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+      <FieldError error={error} />
     </div>
   );
 }

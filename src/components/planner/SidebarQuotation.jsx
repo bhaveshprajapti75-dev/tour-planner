@@ -1,34 +1,27 @@
- import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, X, Share2, Download, Receipt, CalendarDays, MapPin, Users, Route } from 'lucide-react';
+import { Check, X, Receipt, MapPin, Route } from 'lucide-react';
 import usePlannerStore from '../../store/plannerStore';
-import toast from 'react-hot-toast';
 
 export default function SidebarQuotation() {
     const store = usePlannerStore();
-    const { totalDays, totalNights, travelType, selectedCountry, itinerary, dayTourDetails,
-        selectedTemplate } = store;
+    const { totalDays, totalNights, travelType, selectedCountry,
+        itinerary, editableItinerary, draftPlan } = store;
     const [activeTab, setActiveTab] = useState('summary');
 
-    const handleDownloadPDF = useCallback(() => {
-        window.dispatchEvent(new CustomEvent('download-pdf'));
-        toast.success('Generating PDF...');
-    }, []);
-
-    const handleShareLink = useCallback(() => {
-        navigator.clipboard?.writeText(window.location.href);
-        toast.success('Link copied to clipboard!');
-    }, []);
+    // Use editableItinerary (from draft plan) with fallback to legacy itinerary
+    const days = editableItinerary.length > 0 ? editableItinerary : itinerary;
 
     // Calculate total from day tour prices
-    const dayTourTotal = itinerary.reduce((sum, day) => {
+    const dayTourTotal = days.reduce((sum, day) => {
         const price = day.dayTour?.price ? Number(day.dayTour.price) : 0;
         return sum + price;
     }, 0);
 
-    // Gather inclusions/exclusions from template's own incl_excl data
-    const selectedItems = (selectedTemplate?.incl_excl || []).filter(ie => ie.type === 'INCLUSION');
-    const excludedItems = (selectedTemplate?.incl_excl || []).filter(ie => ie.type === 'EXCLUSION');
+    // Gather inclusions/exclusions from the draft plan's incl_excl
+    const planInclExcl = draftPlan?.incl_excl || [];
+    const selectedItems = planInclExcl.filter(ie => ie.type === 'INCLUSION');
+    const excludedItems = planInclExcl.filter(ie => ie.type === 'EXCLUSION');
 
     return (
         <div className="bg-white dark:bg-d-card rounded-[2.5rem] shadow-xl shadow-ink/5 dark:shadow-black/20 border border-gray-100 dark:border-white/[0.08] flex flex-col max-h-[calc(100vh-8rem)] overflow-hidden">
@@ -71,7 +64,7 @@ export default function SidebarQuotation() {
             </div>
 
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto px-8 pb-8 hide-scrollbar">
+            <div className="flex-1 overflow-y-auto px-8 pb-6 hide-scrollbar">
                 <AnimatePresence mode="wait">
                     {activeTab === 'summary' && (
                         <motion.div
@@ -81,52 +74,42 @@ export default function SidebarQuotation() {
                             exit={{ opacity: 0, x: -10 }}
                             className="space-y-6"
                         >
-                            {/* Total if available */}
-                            {dayTourTotal > 0 && (
-                                <div className="bg-gradient-to-br from-brand to-brand-hover p-6 rounded-3xl relative overflow-hidden shadow-lg shadow-brand/30 text-white">
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 blur-2xl" />
-                                    <div className="relative z-10">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <Receipt className="w-6 h-6 text-brand-100" />
-                                            <div className="text-[10px] font-bold text-brand-100 uppercase tracking-widest text-right">Estimated Total</div>
-                                        </div>
-                                        <div className="text-4xl font-bold tracking-tighter">
-                                            INR {dayTourTotal.toLocaleString()}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Route Summary */}
+                            {/* Route Summary with scrollable day list */}
                             <div className="space-y-3 text-sm bg-gray-50/50 dark:bg-d-surface/50 p-5 rounded-3xl border border-gray-100 dark:border-white/[0.08]">
                                 <div className="text-xs uppercase tracking-widest font-extrabold text-ink/40 dark:text-white/30 mb-3 flex items-center gap-1.5">
                                     <Route className="w-3.5 h-3.5" /> Day-by-Day
                                 </div>
-                                {itinerary.map((day) => (
-                                    <div key={day.dayNumber} className={`flex justify-between items-center py-2 ${day.dayNumber < itinerary.length ? 'border-b border-gray-200/60 dark:border-white/[0.06] pb-3' : ''}`}>
-                                        <div className="flex items-center gap-2 text-ink/70 dark:text-white/60 font-medium">
-                                            <span className="w-6 h-6 rounded-full bg-brand/10 text-brand flex items-center justify-center text-xs font-bold shrink-0">{day.dayNumber}</span>
-                                            <span className="line-clamp-1">{day.dayTour?.activity_combination || (day.isDeparture ? 'Departure' : 'Free Day')}</span>
+                                <div className="max-h-[280px] overflow-y-auto hide-scrollbar space-y-0">
+                                    {days.map((day) => (
+                                        <div key={day.dayNumber} className={`flex justify-between items-center py-2 ${day.dayNumber < days.length ? 'border-b border-gray-200/60 dark:border-white/[0.06] pb-3' : ''}`}>
+                                            <div className="flex items-center gap-2 text-ink/70 dark:text-white/60 font-medium">
+                                                <span className="w-6 h-6 rounded-full bg-brand/10 text-brand flex items-center justify-center text-xs font-bold shrink-0">{day.dayNumber}</span>
+                                                <span className="line-clamp-1 text-xs">{day.dayTour?.activity_combination || (day.isDeparture ? 'Departure' : 'Free Day')}</span>
+                                            </div>
+                                            {day.dayTour?.price && Number(day.dayTour.price) > 0 && (
+                                                <div className="font-bold text-ink dark:text-white shrink-0 ml-2 text-xs">INR {Number(day.dayTour.price).toLocaleString()}</div>
+                                            )}
                                         </div>
-                                        {day.dayTour?.price && Number(day.dayTour.price) > 0 && (
-                                            <div className="font-bold text-ink dark:text-white shrink-0 ml-2">INR {Number(day.dayTour.price).toLocaleString()}</div>
-                                        )}
+                                    ))}
+                                </div>
+                                
+                                {/* Total at bottom of day list */}
+                                {dayTourTotal > 0 && (
+                                    <div className="pt-4 mt-3 border-t-2 border-brand/20">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm font-bold text-ink dark:text-white uppercase tracking-wide">Total</span>
+                                            <span className="text-2xl font-black text-brand">INR {dayTourTotal.toLocaleString()}</span>
+                                        </div>
                                     </div>
-                                ))}
+                                )}
                             </div>
 
-                            {/* Country + Template */}
+                            {/* Country */}
                             <div className="space-y-2 text-sm bg-gray-50/50 dark:bg-d-surface/50 p-5 rounded-3xl border border-gray-100 dark:border-white/[0.08]">
                                 {selectedCountry && (
                                     <div className="flex justify-between items-center py-1">
                                         <span className="text-ink-light dark:text-white/60 font-medium flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-brand" /> Country</span>
                                         <span className="font-bold text-ink dark:text-white">{selectedCountry.name}</span>
-                                    </div>
-                                )}
-                                {selectedTemplate && (
-                                    <div className="flex justify-between items-center py-1">
-                                        <span className="text-ink-light dark:text-white/60 font-medium flex items-center gap-1.5"><CalendarDays className="w-3.5 h-3.5 text-brand" /> Template</span>
-                                        <span className="font-bold text-ink dark:text-white text-right max-w-[180px] truncate">{selectedTemplate.name}</span>
                                     </div>
                                 )}
                             </div>
@@ -177,15 +160,6 @@ export default function SidebarQuotation() {
                 </AnimatePresence>
             </div>
 
-            {/* Action Footer */}
-            <div className="p-6 bg-white dark:bg-d-card border-t border-gray-100 dark:border-white/[0.08] flex gap-3">
-                <button onClick={handleShareLink} className="flex-1 flex justify-center items-center gap-2 bg-canvas dark:bg-d-surface text-ink dark:text-white py-3.5 rounded-2xl font-bold text-sm hover:bg-gray-200 dark:hover:bg-white/10 transition-all cursor-pointer">
-                    <Share2 className="w-4 h-4" /> Share
-                </button>
-                <button onClick={handleDownloadPDF} className="flex-1 flex justify-center items-center gap-2 bg-brand text-white py-3.5 rounded-2xl font-bold text-sm hover:bg-brand-hover shadow-lg shadow-brand/20 transition-all hover:-translate-y-0.5 cursor-pointer">
-                    <Download className="w-4 h-4" /> PDF
-                </button>
-            </div>
         </div>
     );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Mail, Phone, Lock, ArrowRight, ShieldCheck, Loader2 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -14,10 +14,12 @@ export default function AuthPage() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '' });
 
   // If already logged in, redirect
-  if (isAuthenticated) {
-    const redirect = searchParams.get('redirect');
-    if (redirect) navigate(redirect, { replace: true });
-  }
+  useEffect(() => {
+    if (isAuthenticated) {
+      const redirect = searchParams.get('redirect');
+      if (redirect) navigate(redirect, { replace: true });
+    }
+  }, [isAuthenticated, searchParams, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

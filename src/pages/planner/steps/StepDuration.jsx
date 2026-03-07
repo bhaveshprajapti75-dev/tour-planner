@@ -1,144 +1,156 @@
-import { motion } from 'framer-motion';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { CalendarRange, ArrowLeft, ArrowRight, Train, Loader2, PackageX } from 'lucide-react';
+import { CalendarRange, Crown, ChevronDown } from 'lucide-react';
 import usePlannerStore from '../../../store/plannerStore';
 import StepHeader from '../../../components/planner/StepHeader';
-import CustomSelect from '../../../components/planner/CustomSelect';
+
+const INITIAL_DAYS = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+const MORE_DAYS = [21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
+const POPULAR_DAYS = new Set([4, 7, 10, 14]);
+const PREMIUM_DAYS = new Set([21, 22, 23, 24, 25, 26, 27, 28, 29, 30]);
 
 export default function StepDuration() {
-  const {
-    totalDays, setTotalDays, startDate, setStartDate, selectedCountry,
-    availableDays, availableDaysLoading,
-  } = usePlannerStore();
+  const { totalDays, setTotalDays, startDate, setStartDate } = usePlannerStore();
+  const [showMore, setShowMore] = useState(false);
+
+  const visibleDays = showMore ? [...INITIAL_DAYS, ...MORE_DAYS] : INITIAL_DAYS;
+
+  // Compute end-date for calendar highlight
+  const startDateObj = startDate ? new Date(startDate) : null;
+  const endDateObj = startDateObj && totalDays > 0
+    ? new Date(new Date(startDateObj).setDate(startDateObj.getDate() + totalDays - 1))
+    : null;
+
+  const handleDateChange = (date) => {
+    if (!date) { setStartDate(null); return; }
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    setStartDate(`${y}-${m}-${d}`);
+  };
 
   return (
     <div className="space-y-8">
-      <StepHeader icon={CalendarRange} title="When & How Long?" desc="Pick your start date and duration" />
+      <StepHeader icon={CalendarRange} title="When & How Long?" desc="Enter your trip duration and choose a start date" />
+
       <div className="flex flex-col md:flex-row gap-8 lg:gap-12">
-        {/* LEFT: TRIP DURATION */}
-        <div className="flex-[1.8] space-y-4 order-last md:order-first">
-          <label className="block text-sm font-bold text-ink/70 dark:text-white/70">Trip Duration</label>
+        {/* LEFT: Duration cards */}
+        <div className="flex-1 min-w-0">
+          <label className="block text-sm font-bold text-ink/70 dark:text-white/70 mb-4">
+            Number of Days
+          </label>
+          <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2">
+            {visibleDays.map(d => (
+              <motion.button
+                key={d}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setTotalDays(d)}
+                className={`relative py-2 px-2 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer border group
+                  ${totalDays === d
+                    ? 'bg-gradient-to-br from-brand to-purple-600 text-white border-transparent shadow-lg'
+                    : 'bg-white dark:bg-d-card border-ink/[0.08] dark:border-white/[0.08] text-ink/80 dark:text-white/80 hover:border-brand/30 hover:shadow-md'
+                  }`}
+              >
+                <div className="flex flex-col items-center">
+                  {POPULAR_DAYS.has(d) && (
+                    <Crown
+                      size={11}
+                      className={`mb-0.5 ${
+                        totalDays === d ? 'text-amber-300' : 'text-amber-500'
+                      }`}
+                      fill="currentColor"
+                    />
+                  )}
+                  
+                  {PREMIUM_DAYS.has(d) && (
+                    <Crown
+                      size={11}
+                      className={`mb-0.5 ${
+                        totalDays === d ? 'text-amber-300' : 'text-amber-500'
+                      }`}
+                      fill="currentColor"
+                    />
+                  )}
+                  
+                  <span className={`text-lg font-bold leading-none ${totalDays === d ? 'text-white' : 'text-brand'}`}>
+                    {d}
+                  </span>
+                  <span className={`text-[10px] mt-0.5 ${totalDays === d ? 'text-white/80' : 'text-ink/50 dark:text-white/50'}`}>
+                    {d === 1 ? 'day' : 'days'}
+                  </span>
+                </div>
+              </motion.button>
+            ))}
 
-          {/* Loading state */}
-          {availableDaysLoading && (
-            <div className="flex items-center gap-3 py-8">
-              <Loader2 className="w-5 h-5 text-brand animate-spin" />
-              <span className="text-sm font-medium text-ink/50 dark:text-white/40">Loading available plans…</span>
-            </div>
-          )}
+            {!showMore && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowMore(true)}
+                className="py-2 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer border border-dashed border-brand/30 bg-brand/5 dark:bg-brand/10 text-brand hover:border-brand/40 hover:shadow-md flex flex-col items-center justify-center gap-0.5"
+              >
+                <span>More</span>
+                <ChevronDown size={12} />
+              </motion.button>
+            )}
+          </div>
 
-          {/* No plans available */}
-          {!availableDaysLoading && availableDays.length === 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col items-center justify-center py-10 rounded-[2rem] bg-white/60 dark:bg-d-card/60 border border-ink/[0.06] dark:border-white/[0.06]"
+          {totalDays > 0 && (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mt-3 text-sm font-semibold text-brand"
             >
-              <div className="w-14 h-14 rounded-2xl bg-warning/10 flex items-center justify-center mb-3">
-                <PackageX className="w-7 h-7 text-warning" />
-              </div>
-              <p className="text-sm font-bold text-ink/60 dark:text-white/50">No itinerary plans available</p>
-              <p className="text-xs text-ink/40 dark:text-white/30 mt-1">Try selecting a different country</p>
-            </motion.div>
-          )}
-
-          {/* Available day buttons */}
-          {!availableDaysLoading && availableDays.length > 0 && (
-            <>
-              <p className="text-xs text-ink/40 dark:text-white/30 font-medium -mt-2">
-                Showing durations with available itinerary plans
-              </p>
-              <div className="flex flex-wrap gap-3">
-                {availableDays.map(d => (
-                  <motion.button key={d} onClick={() => setTotalDays(d)}
-                    whileHover={{ y: -2, scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className={`py-3 px-5 min-w-[5rem] flex flex-col items-center justify-center rounded-[1.25rem] transition-all cursor-pointer border shadow-sm
-                      ${totalDays === d
-                        ? 'bg-gradient-to-br from-brand to-purple-600 text-white border-white/20 shadow-[0_8px_25px_rgba(79,70,229,0.35)] z-10'
-                        : 'bg-white/80 dark:bg-d-card/80 backdrop-blur-md border-ink/[0.04] dark:border-white/[0.04] text-ink/70 dark:text-white/70 hover:bg-white dark:hover:bg-d-card hover:border-brand/30 hover:shadow-md'
-                      }`}>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-black tracking-tight">{d}</span>
-                      <span className={`text-[10px] uppercase tracking-widest font-bold ${totalDays === d ? 'opacity-90' : 'opacity-60'}`}>days</span>
-                    </div>
-                  </motion.button>
-                ))}
-              </div>
-            </>
+              {totalDays} day{totalDays !== 1 ? 's' : ''} / {totalDays - 1} night{totalDays - 1 !== 1 ? 's' : ''}
+            </motion.p>
           )}
         </div>
 
-        {/* RIGHT: START DATE (CALENDAR) */}
-        <div className="flex-1 space-y-4">
-          <label className="block text-sm font-bold text-ink/70 dark:text-white/70">Start Date (Optional)</label>
-          <div className="bg-white/80 dark:bg-d-card/80 backdrop-blur-md rounded-[2rem] border border-ink/[0.04] dark:border-white/[0.04] p-4 lg:p-5 shadow-sm inline-block w-full sm:w-auto">
+        {/* RIGHT: Calendar */}
+        <div className="shrink-0 flex flex-col items-center">
+          <label className="block text-sm font-bold text-ink/70 dark:text-white/70 mb-3 self-start">
+            Start Date <span className="text-xs font-normal opacity-50">(optional)</span>
+          </label>
+          <div className="planner-datepicker">
             <DatePicker
-              selected={startDate ? new Date(startDate) : null}
-              onChange={(date) => {
-                if (date) {
-                  const y = date.getFullYear();
-                  const m = String(date.getMonth() + 1).padStart(2, '0');
-                  const d = String(date.getDate()).padStart(2, '0');
-                  setStartDate(`${y}-${m}-${d}`);
-                } else {
-                  setStartDate('');
-                }
-              }}
-              dateFormat="dd MMM yyyy"
+              selected={startDateObj}
+              onChange={handleDateChange}
+              startDate={startDateObj}
+              endDate={endDateObj}
+              selectsStart
               minDate={new Date()}
+              monthsShown={1}
               inline
-              renderCustomHeader={({
-                date,
-                changeYear,
-                changeMonth,
-                decreaseMonth,
-                increaseMonth,
-                prevMonthButtonDisabled,
-                nextMonthButtonDisabled,
-              }) => (
-                <div className="flex items-center justify-between px-2 mb-3">
-                  <button onClick={decreaseMonth} disabled={prevMonthButtonDisabled} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-ink/5 dark:hover:bg-white/5 transition-colors disabled:opacity-30 cursor-pointer">
-                    <ArrowLeft className="w-4 h-4" />
-                  </button>
-                  <div className="flex items-center gap-1 justify-center flex-1">
-                    <CustomSelect
-                      value={date.getMonth()}
-                      options={Array.from({ length: 12 }, (_, i) => ({ value: i, label: new Date(0, i).toLocaleString('en', { month: 'short' }) }))}
-                      onChange={changeMonth}
-                    />
-                    <CustomSelect
-                      value={date.getFullYear()}
-                      options={Array.from({ length: 5 }, (_, i) => ({ value: new Date().getFullYear() + i, label: new Date().getFullYear() + i }))}
-                      onChange={changeYear}
-                    />
-                  </div>
-                  <button onClick={increaseMonth} disabled={nextMonthButtonDisabled} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-ink/5 dark:hover:bg-white/5 transition-colors disabled:opacity-30 cursor-pointer">
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-              calendarClassName="!border-none !bg-transparent !shadow-none !font-sans w-full min-w-[280px]"
-              dayClassName={(date) => {
-                const isSelected = startDate && new Date(startDate).toDateString() === date.toDateString();
-                return `rounded-xl w-9 h-9 flex items-center justify-center transition-all ${isSelected ? 'bg-brand text-white shadow-md' : 'text-ink/80 dark:text-white/80 hover:bg-ink/[0.04] dark:hover:bg-white/[0.04]'} ${date < new Date(new Date().setHours(0, 0, 0, 0)) ? 'opacity-30 cursor-not-allowed' : ''}`;
-              }}
-              monthClassName={() => "px-2 py-1 bg-transparent"}
-              className="w-full h-14 px-6 py-4 flex items-center bg-transparent border-none outline-none font-bold"
+              highlightDates={
+                startDateObj && endDateObj
+                  ? Array.from({ length: totalDays }, (_, i) => {
+                    const d = new Date(startDateObj);
+                    d.setDate(d.getDate() + i);
+                    return d;
+                  })
+                  : []
+              }
             />
           </div>
+          <AnimatePresence>
+            {startDateObj && endDateObj && (
+              <motion.p
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="mt-3 text-xs font-semibold text-brand/80"
+              >
+                {startDateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                {' → '}
+                {endDateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </motion.p>
+            )}
+          </AnimatePresence>
         </div>
       </div>
-      {totalDays > 0 && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-brand/[0.06] rounded-2xl p-4 border border-brand/15">
-          <p className="text-sm font-semibold text-brand flex items-center gap-2">
-            <Train className="w-4 h-4" />
-            {totalDays} days / {Math.max(totalDays - 1, 1)} nights{selectedCountry ? ` across ${selectedCountry.name}` : ''}
-          </p>
-        </motion.div>
-      )}
     </div>
   );
 }

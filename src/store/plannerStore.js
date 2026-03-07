@@ -1,13 +1,25 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { geographyAPI, templatesAPI, dayToursAPI, inclusionsAPI, hotelsAPI, plansAPI } from '../services/api';
+import { geographyAPI, templatesAPI, inclusionsAPI, plansAPI } from '../services/api';
+
+/**
+ * Evenly distribute totalDays across cities.
+ * Remainder days go to earlier cities.
+ * e.g. 5 days, 2 cities → [3, 2]
+ */
+function distributeDays(totalDays, numCities) {
+  if (numCities <= 0) return [];
+  const base = Math.floor(totalDays / numCities);
+  const remainder = totalDays % numCities;
+  return Array.from({ length: numCities }, (_, i) => base + (i < remainder ? 1 : 0));
+}
 
 const usePlannerStore = create(
   persist(
     (set, get) => ({
-      // === WIZARD STEP TRACKING ===
+      // === STEP TRACKING ===
       currentStep: 1,
-      totalSteps: 5,
+      totalSteps: 6,
 
       // === STEP 1: Country ===
       countries: [],
@@ -15,55 +27,66 @@ const usePlannerStore = create(
       selectedCountry: null,
 
       // === STEP 2: Travel Type ===
-      travelType: null, // GROUP, SOLO, COUPLE
+      travelType: null,
 
       // === STEP 3: Duration + Date ===
       totalDays: 0,
       totalNights: 0,
       startDate: null,
-      availableDays: [],      // durations that actually have templates
-      availableDaysLoading: false,
 
-      // === STEP 2: Regions/Cities ===
+      // === STEP 4: City Selection ===
       regions: [],
       regionsLoading: false,
-      selectedRegions: [],
+      selectedRegions: [], // [{id, name, code, ...}] ordered list
 
-      // === STEP 3: Template Selection + Day Tours ===
-      templates: [],
-      templatesLoading: false,
-      selectedTemplate: null,
-      dayTourDetails: {}, // { dayTourId: fullDayTourObject }
-      dayToursLoading: false,
+      // === STEP 5: City-Day Allocation ===
+      // [{ region: {id, name, ...}, days: N }]
+      cityAllocations: [],
 
-      // === Inclusions / Exclusions ===
-      inclusionsData: null, // { INCLUSION: {...}, EXCLUSION: {...} }
-      inclusionsLoading: false,
-      selectedInclusions: [], // IDs of incl/excl items user has selected
+      // === DRAFT PLAN (auto-generated after Step 5) ===
+      draftPlan: null,       // full plan object from API
+      draftLoading: false,
 
-      // === Hotels (optional) ===
-      hotels: [],
-      hotelsLoading: false,
+      // === EDITABLE ITINERARY (loaded from draftPlan) ===
+      // [{ dayNumber, date, regionId, regionName, templateId, templateName,
+      //    includesNight, dayTourId, dayTour, planDayId }]
+      editableItinerary: [],
 
-      // === GENERATED ITINERARY ===
-      itinerary: [], // built from template days + dayTour details
+      // === CITY TEMPLATES (for replacement in itinerary step) ===
+      // { [regionId]: [template, ...] }
+      cityTemplates: {},
+      cityTemplatesLoading: {},
 
-      // === SAVED PLAN ===
+      // === SAVED / FINALIZED PLAN ===
       savedPlan: null,
       saving: false,
 
-      // === USER PLANS HISTORY ===
+      // === INCLUSIONS ===
+      inclusionsData: null,
+      inclusionsLoading: false,
+      selectedInclusions: [],
+
+      // === LEGACY fields kept for backward compat ===
+      availableDays: [],
+      availableDaysLoading: false,
+      templates: [],
+      templatesLoading: false,
+      selectedTemplate: null,
+      dayTourDetails: {},
+      hotels: [],
+      hotelsLoading: false,
+      itinerary: [],
       userPlans: [],
       userPlansLoading: false,
 
       // ==================
-      //      ACTIONS
+      //     ACTIONS
       // ==================
       setStep: (step) => set({ currentStep: step }),
       nextStep: () => set((s) => ({ currentStep: Math.min(s.currentStep + 1, s.totalSteps) })),
       prevStep: () => set((s) => ({ currentStep: Math.max(s.currentStep - 1, 1) })),
 
-      // --- Step 1 ---
+      // --- Step 1: Country ---
       fetchCountries: async () => {
         set({ countriesLoading: true });
         try {
@@ -77,23 +100,22 @@ const usePlannerStore = create(
       setSelectedCountry: (country) => {
         set({
           selectedCountry: country,
-          regions: [],
-          selectedRegions: [],
-          templates: [],
-          selectedTemplate: null,
-          dayTourDetails: {},
-          inclusionsData: null,
-          itinerary: [],
-          availableDays: [],
-          totalDays: 0,
-          totalNights: 0,
+          regions: [], selectedRegions: [], cityAllocations: [],
+          templates: [], selectedTemplate: null, dayTourDetails: {},
+          inclusionsData: null, itinerary: [], editableItinerary: [],
+          draftPlan: null, savedPlan: null,
+          availableDays: [], totalDays: 0, totalNights: 0,
         });
-        // Auto-fetch available durations for this country
-        if (country) {
-          get().fetchAvailableDays(country.id);
-        }
       },
 
+      // --- Step 2: Travel Type ---
+      setTravelType: (type) => set({ travelType: type }),
+
+      // --- Step 3: Duration + Date ---
+      setTotalDays: (days) => set({ totalDays: days, totalNights: Math.max(days - 1, 0) }),
+      setStartDate: (date) => set({ startDate: date }),
+
+      // Legacy: still fetches available days for old StepTemplates (if needed)
       fetchAvailableDays: async (countryId) => {
         set({ availableDaysLoading: true });
         try {
@@ -101,31 +123,13 @@ const usePlannerStore = create(
           const params = { country: countryId };
           if (travelType) params.travel_type = travelType;
           const { data } = await templatesAPI.getAvailableDays(params);
-          const daysSet = data.days || [];
-          const firstDay = daysSet[0] || 0;
-          set({
-            availableDays: daysSet,
-            availableDaysLoading: false,
-            totalDays: firstDay,
-            totalNights: Math.max(firstDay - 1, 0),
-          });
+          set({ availableDays: data.days || [], availableDaysLoading: false });
         } catch {
           set({ availableDaysLoading: false });
         }
       },
 
-      setTravelType: (type) => {
-        set({ travelType: type, availableDays: [], totalDays: 0, totalNights: 0 });
-        // Re-fetch available days for the new travel type
-        const { selectedCountry } = get();
-        if (selectedCountry) {
-          get().fetchAvailableDays(selectedCountry.id);
-        }
-      },
-      setTotalDays: (days) => set({ totalDays: days, totalNights: Math.max(days - 1, 1) }),
-      setStartDate: (date) => set({ startDate: date }),
-
-      // --- Step 2 ---
+      // --- Step 4: City (Region) Selection ---
       fetchRegions: async (countryId) => {
         set({ regionsLoading: true });
         try {
@@ -136,45 +140,154 @@ const usePlannerStore = create(
         }
       },
 
-      toggleRegion: (regionId) => set((s) => {
-        const isSelected = s.selectedRegions.includes(regionId);
-        return {
-          selectedRegions: isSelected
-            ? s.selectedRegions.filter(r => r !== regionId)
-            : [...s.selectedRegions, regionId]
-        };
+      toggleRegion: (region) => set((s) => {
+        const exists = s.selectedRegions.find(r => r.id === region.id);
+        const updated = exists
+          ? s.selectedRegions.filter(r => r.id !== region.id)
+          : [...s.selectedRegions, region];
+        // Auto-rebalance city allocations whenever region selection changes
+        const days = distributeDays(s.totalDays, updated.length);
+        const allocations = updated.map((r, i) => ({ region: r, days: days[i] || 1 }));
+        return { selectedRegions: updated, cityAllocations: allocations };
       }),
 
-      // --- Step 3 ---
-      fetchTemplates: async (countryId, totalDays) => {
-        set({ templatesLoading: true });
+      // --- Step 5: City-Day Adjustment ---
+      /**
+       * Update the day count for a city. Clamps to 1 min.
+       * Steals/gives days from/to adjacent cities to keep total constant.
+       */
+      setCityDays: (regionId, newDays) => set((s) => {
+        const allocs = s.cityAllocations.map(a => ({ ...a }));
+        const idx = allocs.findIndex(a => a.region.id === regionId);
+        if (idx === -1) return {};
+        const clampedNew = Math.max(1, newDays);
+        const delta = clampedNew - allocs[idx].days;
+        if (delta === 0) return {};
+        // Find another city to absorb the delta
+        const otherIdx = allocs.findIndex((a, i) => i !== idx && a.days + (-delta) >= 1);
+        if (otherIdx === -1) return {}; // can't rebalance — skip
+        allocs[idx].days = clampedNew;
+        allocs[otherIdx].days -= delta;
+        return { cityAllocations: allocs };
+      }),
+
+      removeCity: (regionId) => set((s) => {
+        const updated = s.selectedRegions.filter(r => r.id !== regionId);
+        const days = distributeDays(s.totalDays, updated.length);
+        const allocations = updated.map((r, i) => ({ region: r, days: days[i] || 1 }));
+        return { selectedRegions: updated, cityAllocations: allocations };
+      }),
+
+      addCity: (region) => set((s) => {
+        if (s.selectedRegions.find(r => r.id === region.id)) return {};
+        if (s.cityAllocations.reduce((t, a) => t + a.days, 0) >= s.totalDays) return {};
+        const updated = [...s.selectedRegions, region];
+        const days = distributeDays(s.totalDays, updated.length);
+        const allocations = updated.map((r, i) => ({ region: r, days: days[i] || 1 }));
+        return { selectedRegions: updated, cityAllocations: allocations };
+      }),
+
+      // --- Auto-Generate Draft Plan ---
+      autoGenerateDraft: async () => {
+        const { selectedCountry, totalDays, startDate, travelType, cityAllocations } = get();
+        if (!selectedCountry || !totalDays || cityAllocations.length === 0) return null;
+        set({ draftLoading: true });
         try {
-          const { travelType } = get();
-          const params = { country: countryId, total_days: totalDays, page_size: 50 };
-          if (travelType) params.travel_type = travelType;
-          const { data } = await templatesAPI.getTemplates(params);
-          set({ templates: data.results || [], templatesLoading: false });
-        } catch {
-          set({ templatesLoading: false });
+          const payload = {
+            country: selectedCountry.id,
+            total_days: totalDays,
+            start_date: startDate || null,
+            travel_type: travelType || null,
+            city_allocations: cityAllocations.map(a => ({
+              region: a.region.id,
+              days: a.days,
+            })),
+          };
+          const { data: plan } = await plansAPI.autoGenerateDraft(payload);
+          // Build editable itinerary from plan days
+          const editable = _buildEditableItinerary(plan, startDate);
+          set({ draftPlan: plan, editableItinerary: editable, draftLoading: false });
+          return plan;
+        } catch (e) {
+          set({ draftLoading: false });
+          throw e;
         }
       },
 
-      selectTemplate: (template) => {
-        // Extract day tour details from nested day_tour_detail in template response
-        const details = { ...get().dayTourDetails };
-        for (const day of (template.days || [])) {
-          if (day.day_tour_detail && day.day_tour) {
-            details[day.day_tour] = day.day_tour_detail;
-          }
+      // --- Itinerary Editing ---
+      /**
+       * Swap the template for a specific day.
+       * Calls PATCH /user-plans/plan-days/{id}/ with new template + day_tour.
+       */
+      updateDayTemplate: async (planDayId, template) => {
+        const dayTour = template.days?.[0]?.day_tour || null;
+        const dayTourObj = template.days?.[0]?.day_tour_detail || null;
+        await plansAPI.updatePlanDay(planDayId, {
+          template: template.id,
+          day_tour: dayTour,
+        });
+        set((s) => ({
+          editableItinerary: s.editableItinerary.map(d =>
+            d.planDayId === planDayId
+              ? { ...d, templateId: template.id, templateName: template.name, includesNight: template.includes_night, dayTourId: dayTour, dayTour: dayTourObj }
+              : d
+          ),
+        }));
+      },
+
+      // Fetch templates for a specific region (used in Replace Template modal)
+      fetchCityTemplates: async (regionId) => {
+        if (get().cityTemplates[regionId]) return; // already loaded
+        set((s) => ({ cityTemplatesLoading: { ...s.cityTemplatesLoading, [regionId]: true } }));
+        try {
+          const { travelType } = get();
+          const params = { region: regionId, page_size: 50 };
+          if (travelType) params.travel_type = travelType;
+          const { data } = await templatesAPI.getTemplates(params);
+          set((s) => ({
+            cityTemplates: { ...s.cityTemplates, [regionId]: data.results || [] },
+            cityTemplatesLoading: { ...s.cityTemplatesLoading, [regionId]: false },
+          }));
+        } catch {
+          set((s) => ({ cityTemplatesLoading: { ...s.cityTemplatesLoading, [regionId]: false } }));
         }
-        // Auto-init inclusions from template's attached incl/excl
-        const inclIds = (template.incl_excl || []).map(ie => ie.incl_excl);
-        set({ selectedTemplate: template, dayTourDetails: details, dayToursLoading: false, selectedInclusions: inclIds });
-        // Also fetch grouped inclusions for display if not loaded yet
-        const { inclusionsData, selectedCountry } = get();
-        if (!inclusionsData && selectedCountry) {
-          get().fetchInclusions(selectedCountry.id);
+      },
+
+      // --- Finalize Plan ---
+      finalizePlan: async () => {
+        const { draftPlan } = get();
+        if (!draftPlan) return null;
+        set({ saving: true });
+        try {
+          const { data: plan } = await plansAPI.finalizePlan(draftPlan.id);
+          set({ savedPlan: plan, draftPlan: plan, saving: false });
+          return plan;
+        } catch (e) {
+          set({ saving: false });
+          throw e;
         }
+      },
+
+      // --- Refresh Draft Plan (re-fetch from API to get updated incl_excl etc.) ---
+      refreshDraftPlan: async () => {
+        const { draftPlan, startDate } = get();
+        if (!draftPlan?.id) return;
+        try {
+          const { data: plan } = await plansAPI.getPlan(draftPlan.id);
+          const editable = _buildEditableItinerary(plan, startDate);
+          set({ draftPlan: plan, editableItinerary: editable });
+        } catch { /* silent */ }
+      },
+
+      // --- PDF Download ---
+      downloadPdf: async (planId) => {
+        const { data } = await plansAPI.exportPdf(planId);
+        const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `itinerary-${planId}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
       },
 
       // --- Inclusions ---
@@ -187,152 +300,18 @@ const usePlannerStore = create(
           set({ inclusionsLoading: false });
         }
       },
+      toggleInclusion: (id) => set((s) => ({
+        selectedInclusions: s.selectedInclusions.includes(id)
+          ? s.selectedInclusions.filter(i => i !== id)
+          : [...s.selectedInclusions, id],
+      })),
 
-      toggleInclusion: (id) => set((s) => {
-        const isSelected = s.selectedInclusions.includes(id);
-        return {
-          selectedInclusions: isSelected
-            ? s.selectedInclusions.filter(i => i !== id)
-            : [...s.selectedInclusions, id]
-        };
-      }),
-
-      setSelectedInclusions: (ids) => set({ selectedInclusions: ids }),
-
-      // Initialize inclusions from template's attached incl/excl
-      initInclusionsFromTemplate: () => {
-        const { selectedTemplate } = get();
-        if (selectedTemplate?.incl_excl) {
-          const ids = selectedTemplate.incl_excl.map(ie => ie.incl_excl);
-          set({ selectedInclusions: ids });
-        }
-      },
-
-      // --- Hotels ---
-      fetchHotels: async (regionId) => {
-        set({ hotelsLoading: true });
-        try {
-          const { data } = await hotelsAPI.getHotels({ region: regionId, page_size: 50 });
-          set({ hotels: data.results || [], hotelsLoading: false });
-        } catch {
-          set({ hotelsLoading: false });
-        }
-      },
-
-      // --- Build Itinerary from Template ---
+      // --- Legacy: buildItinerary (kept for /planner/itinerary backward compat) ---
       buildItinerary: () => {
-        const { selectedTemplate, dayTourDetails, startDate } = get();
-        if (!selectedTemplate) return;
-
-        const days = [...(selectedTemplate.days || [])].sort((a, b) => a.day_number - b.day_number);
-
-        // Parse startDate using local date parts to avoid timezone shift
-        let baseDate;
-        if (startDate) {
-          const [y, m, d] = startDate.split('-').map(Number);
-          baseDate = new Date(y, m - 1, d);
-        } else {
-          baseDate = new Date();
-        }
-
-        const formatDate = (dt) => {
-          const dd = String(dt.getDate()).padStart(2, '0');
-          const mm = String(dt.getMonth() + 1).padStart(2, '0');
-          const yyyy = dt.getFullYear();
-          return `${dd}/${mm}/${yyyy}`;
-        };
-
-        const itinerary = days.map((d) => {
-          const date = new Date(baseDate);
-          date.setDate(date.getDate() + d.day_number - 1);
-          // Use nested day_tour_detail first, fall back to separately fetched details
-          const tour = d.day_tour_detail || dayTourDetails[d.day_tour] || null;
-
-          return {
-            dayNumber: d.day_number,
-            date: formatDate(date),
-            isArrival: d.is_arrival_day,
-            isDeparture: d.is_departure_day,
-            dayTourId: d.day_tour,
-            dayTour: tour,
-            templateDayId: d.id,
-          };
-        });
-
-        set({ itinerary });
-      },
-
-      // --- Save Plan to Backend ---
-      savePlan: async ({ name, clientName, clientEmail, clientPhone, notes } = {}) => {
-        const { selectedCountry, selectedTemplate, totalDays, totalNights, startDate, itinerary, selectedInclusions, savedPlan: existingPlan } = get();
-        if (!selectedCountry) return null;
-
-        set({ saving: true });
-        try {
-          const planPayload = {
-            country: selectedCountry.id,
-            based_on_template: selectedTemplate?.id || null,
-            name: name || `${selectedCountry.name} ${totalDays}D Tour`,
-            total_days: totalDays,
-            total_nights: totalNights,
-            start_date: startDate || null,
-            client_name: clientName || null,
-            client_email: clientEmail || null,
-            client_phone: clientPhone || null,
-            notes: notes || null,
-            status: 'DRAFT',
-          };
-
-          let plan;
-          if (existingPlan?.id) {
-            // Update existing plan
-            const { data } = await plansAPI.updatePlan(existingPlan.id, planPayload);
-            plan = data;
-
-            // Delete old days and inclusions, then re-create
-            if (existingPlan.days?.length) {
-              await Promise.all(existingPlan.days.map(d => plansAPI.deletePlanDay(d.id)));
-            }
-            if (existingPlan.incl_excl?.length) {
-              await Promise.all(existingPlan.incl_excl.map(ie => plansAPI.deletePlanInclExcl(ie.id)));
-            }
-          } else {
-            // Create new plan
-            const { data } = await plansAPI.createPlan(planPayload);
-            plan = data;
-          }
-
-          // Create plan days
-          await Promise.all(
-            itinerary.map((day) =>
-              plansAPI.createPlanDay({
-                user_plan: plan.id,
-                day_number: day.dayNumber,
-                day_tour: day.dayTourId,
-              })
-            )
-          );
-
-          // Add selected inclusions/exclusions
-          if (selectedInclusions.length > 0) {
-            await Promise.all(
-              selectedInclusions.map((inclId) =>
-                plansAPI.createPlanInclExcl({
-                  user_plan: plan.id,
-                  incl_excl: inclId,
-                })
-              )
-            );
-          }
-
-          // Fetch the complete saved plan
-          const { data: savedPlan } = await plansAPI.getPlan(plan.id);
-          set({ savedPlan, saving: false });
-          return savedPlan;
-        } catch (e) {
-          set({ saving: false });
-          throw e;
-        }
+        const { draftPlan, startDate } = get();
+        if (!draftPlan) return;
+        const editable = _buildEditableItinerary(draftPlan, startDate);
+        set({ itinerary: editable, editableItinerary: editable });
       },
 
       // --- User Plans History ---
@@ -345,12 +324,10 @@ const usePlannerStore = create(
           set({ userPlansLoading: false });
         }
       },
-
       deletePlan: async (id) => {
         await plansAPI.deletePlan(id);
         set((s) => ({ userPlans: s.userPlans.filter(p => p.id !== id) }));
       },
-
       clonePlan: async (id) => {
         const { data } = await plansAPI.clonePlan(id);
         await get().fetchUserPlans();
@@ -362,20 +339,14 @@ const usePlannerStore = create(
         currentStep: 1,
         selectedCountry: null,
         travelType: null,
-        totalDays: 0,
-        totalNights: 0,
-        startDate: null,
+        totalDays: 0, totalNights: 0, startDate: null,
         availableDays: [],
-        regions: [],
-        selectedRegions: [],
-        templates: [],
-        selectedTemplate: null,
-        dayTourDetails: {},
-        inclusionsData: null,
-        selectedInclusions: [],
-        hotels: [],
-        itinerary: [],
-        savedPlan: null,
+        regions: [], selectedRegions: [], cityAllocations: [],
+        templates: [], selectedTemplate: null, dayTourDetails: {},
+        inclusionsData: null, selectedInclusions: [],
+        itinerary: [], editableItinerary: [],
+        draftPlan: null, savedPlan: null,
+        cityTemplates: {}, cityTemplatesLoading: {},
       }),
     }),
     {
@@ -388,11 +359,47 @@ const usePlannerStore = create(
         totalNights: state.totalNights,
         startDate: state.startDate,
         selectedRegions: state.selectedRegions,
-        selectedTemplate: state.selectedTemplate,
+        cityAllocations: state.cityAllocations,
+        draftPlan: state.draftPlan,
         savedPlan: state.savedPlan,
+        editableItinerary: state.editableItinerary,
+        selectedInclusions: state.selectedInclusions,
       }),
     }
   )
 );
+
+/** Build the editable itinerary array from a full UserPlan API response. */
+function _buildEditableItinerary(plan, startDate) {
+  const sorted = [...(plan.days || [])].sort((a, b) => a.day_number - b.day_number);
+  let baseDate = null;
+  if (startDate) {
+    const [y, m, d] = startDate.split('-').map(Number);
+    baseDate = new Date(y, m - 1, d);
+  } else {
+    baseDate = new Date();
+  }
+  const fmt = (dt) => {
+    const dd = String(dt.getDate()).padStart(2, '0');
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}/${dt.getFullYear()}`;
+  };
+  return sorted.map((d) => {
+    const date = new Date(baseDate);
+    date.setDate(date.getDate() + d.day_number - 1);
+    return {
+      planDayId: d.id,
+      dayNumber: d.day_number,
+      date: fmt(date),
+      regionId: d.region,
+      regionName: d.region_name || '',
+      templateId: d.template,
+      templateName: d.template_name || '',
+      includesNight: d.includes_night || false,
+      dayTourId: d.day_tour,
+      dayTour: d.day_tour_detail || null,
+    };
+  });
+}
 
 export default usePlannerStore;
