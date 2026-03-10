@@ -417,11 +417,11 @@ export default function ItineraryStep() {
           >
             <motion.div
               initial={{ y: 60, scale: 0.97 }} animate={{ y: 0, scale: 1 }} exit={{ y: 60, scale: 0.97 }}
-              className="bg-white dark:bg-d-surface rounded-3xl shadow-2xl w-full max-w-md max-h-[75vh] flex flex-col overflow-hidden"
+              className="bg-white dark:bg-d-surface rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
             >
               <div className="p-5 border-b border-ink/[0.08] dark:border-white/[0.08] flex items-center justify-between">
                 <div>
-                  <p className="font-extrabold text-ink dark:text-white">Replace Template</p>
+                  <p className="font-extrabold text-lg text-ink dark:text-white">Replace Template</p>
                   <p className="text-xs text-ink/40 dark:text-white/30 mt-0.5">
                     Day {swapTarget.dayNumber} · {swapTarget.regionName}
                   </p>
@@ -431,7 +431,7 @@ export default function ItineraryStep() {
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 {cityTemplatesLoading[swapTarget.regionId] ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="w-6 h-6 text-brand animate-spin" />
@@ -443,24 +443,72 @@ export default function ItineraryStep() {
                 ) : (
                   cityTemplates[swapTarget.regionId].map(tmpl => {
                     const isCurrent = tmpl.id === swapTarget.templateId;
+                    const tour = tmpl.days?.[0]?.day_tour_detail;
+                    const attractions = tour?.attractions || tour?.tour_attractions || [];
                     return (
                       <button key={tmpl.id}
                         onClick={() => !swapping && !isCurrent && handleSwap(tmpl)}
                         disabled={swapping || isCurrent}
-                        className={`w-full text-left p-3 rounded-2xl border transition-all cursor-pointer
+                        className={`w-full text-left p-4 rounded-2xl border-2 transition-all cursor-pointer
                           ${isCurrent
-                            ? 'border-brand bg-brand/[0.06] cursor-default'
-                            : 'border-ink/[0.08] dark:border-white/[0.08] hover:border-brand/40 hover:bg-brand/[0.03]'}`}
+                            ? 'border-brand bg-brand/[0.04] ring-1 ring-brand/20'
+                            : 'border-ink/[0.06] dark:border-white/[0.06] hover:border-brand/40 hover:bg-brand/[0.02]'}`}
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-ink dark:text-white truncate">{tmpl.name}</p>
-                            <p className="text-xs text-ink/40 dark:text-white/30 mt-0.5">
-                              {tmpl.includes_night ? '1 Day + Night' : '1 Day only'}
-                              {tmpl.is_default && <span className="ml-1.5 text-brand">· Default</span>}
-                            </p>
+                        {/* Header: name + selected badge */}
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Route className="w-4 h-4 text-ink/30 dark:text-white/20 shrink-0 mt-0.5" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-ink dark:text-white leading-snug">{tour?.activity_combination || tmpl.name}</p>
+                            </div>
                           </div>
-                          {isCurrent && <Check className="w-4 h-4 text-brand shrink-0" />}
+                          {isCurrent && (
+                            <span className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand/10 text-brand text-[10px] font-bold">
+                              <Check className="w-3 h-3" /> Selected
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Description / itinerary text */}
+                        {tour?.itinerary_text && (
+                          <p className="text-xs text-ink/50 dark:text-white/40 leading-relaxed mb-3 ml-6 line-clamp-2">{tour.itinerary_text}</p>
+                        )}
+
+                        {/* Attractions list */}
+                        {attractions.length > 0 && (
+                          <div className="ml-6 mb-3">
+                            <div className="flex flex-wrap gap-1.5">
+                              {[...attractions].sort((a, b) => a.visit_order - b.visit_order).map((attr) => (
+                                <span key={attr.id}
+                                  className="px-2 py-0.5 bg-canvas dark:bg-d-canvas rounded-md text-[10px] font-semibold text-ink/55 dark:text-white/45 border border-ink/[0.05] dark:border-white/[0.05]">
+                                  {attr.visit_order}. {attr.attraction_name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Meta row: duration, type badge, default badge, price */}
+                        <div className="flex flex-wrap items-center gap-2 ml-6">
+                          {tour?.est_time_distance && (
+                            <div className="flex items-center gap-1 text-[10px] font-semibold text-ink-light dark:text-white/40 bg-ink/[0.04] dark:bg-white/[0.04] px-2 py-0.5 rounded-md">
+                              <Clock className="w-3 h-3" /> {tour.est_time_distance}
+                            </div>
+                          )}
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${tmpl.includes_night ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-300'}`}>
+                            {tmpl.includes_night ? 'Day + Night' : 'Day only'}
+                          </span>
+                          {tmpl.is_default && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-brand/10 text-brand">Default</span>
+                          )}
+                          {tmpl.travel_type && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-ink/[0.04] dark:bg-white/[0.04] text-ink/50 dark:text-white/40">{tmpl.travel_type}</span>
+                          )}
+                          {tour?.price && Number(tour.price) > 0 && (
+                            <span className="text-brand font-black text-xs ml-auto">
+                              {tour.currency || 'INR'} {Number(tour.price).toLocaleString()}
+                            </span>
+                          )}
                         </div>
                       </button>
                     );

@@ -18,7 +18,7 @@ export default function PlannerPage() {
           <Route path="wizard" element={<PlannerWizard />} />
           <Route path="itinerary" element={
             <div className="h-full overflow-y-auto">
-              <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 pb-8 flex gap-8 relative items-start">
+              <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-12 pb-8 flex gap-8 relative items-start">
                 <div className="flex-1 max-w-4xl pr-2">
                   <ItineraryStep />
                 </div>

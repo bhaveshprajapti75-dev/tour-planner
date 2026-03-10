@@ -153,21 +153,17 @@ const usePlannerStore = create(
 
       // --- Step 5: City-Day Adjustment ---
       /**
-       * Update the day count for a city. Clamps to 1 min.
-       * Steals/gives days from/to adjacent cities to keep total constant.
+       * Update the day count for a city. Clamps to 1 min and totalDays max.
+       * Does NOT auto-rebalance other cities — the user picks where days go.
        */
       setCityDays: (regionId, newDays) => set((s) => {
         const allocs = s.cityAllocations.map(a => ({ ...a }));
         const idx = allocs.findIndex(a => a.region.id === regionId);
         if (idx === -1) return {};
-        const clampedNew = Math.max(1, newDays);
-        const delta = clampedNew - allocs[idx].days;
-        if (delta === 0) return {};
-        // Find another city to absorb the delta
-        const otherIdx = allocs.findIndex((a, i) => i !== idx && a.days + (-delta) >= 1);
-        if (otherIdx === -1) return {}; // can't rebalance — skip
+        const othersTotal = allocs.reduce((t, a, i) => i !== idx ? t + a.days : t, 0);
+        const clampedNew = Math.max(1, Math.min(newDays, s.totalDays - othersTotal));
+        if (clampedNew === allocs[idx].days) return {};
         allocs[idx].days = clampedNew;
-        allocs[otherIdx].days -= delta;
         return { cityAllocations: allocs };
       }),
 
