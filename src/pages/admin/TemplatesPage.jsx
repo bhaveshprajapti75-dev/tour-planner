@@ -82,7 +82,7 @@ export default function TemplatesPage() {
     try {
       await templatesAPI.setDefaultTemplate(row.id);
       toast.success(`"${row.name}" is now the default for ${row.region_name || 'this region'}`);
-      crud.load();
+      crud.reload();
     } catch (err) {
       const msg = err.response?.data?.error || 'Failed to set default';
       toast.error(msg);
@@ -150,7 +150,7 @@ export default function TemplatesPage() {
         setOriginalAttachedIds(new Set(attachedIds));
         toast.success(`Saved with ${failures.length} warning(s)`);
       }
-      try { await crud.load(); } catch { /* ignore */ }
+      try { await crud.reload(); } catch { /* ignore */ }
     } catch { toast.error('Failed to save inclusions'); }
     finally { setInclSaving(false); savingRef.current = false; }
   };
@@ -239,7 +239,7 @@ export default function TemplatesPage() {
       toast.success(crud.editing ? 'Template updated' : 'Template created');
       clearErrors();
       crud.closeModal();
-      crud.load();
+      crud.reload();
     } catch (err) {
       const data = err.response?.data;
       if (data && typeof data === 'object') {
