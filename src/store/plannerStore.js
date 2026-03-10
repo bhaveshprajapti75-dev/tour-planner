@@ -231,6 +231,21 @@ const usePlannerStore = create(
         }));
       },
 
+      /**
+       * Assign or change hotel for a specific plan day.
+       * Calls PATCH /user-plans/plan-days/{id}/ with hotel id.
+       */
+      setDayHotel: async (planDayId, hotel) => {
+        await plansAPI.updatePlanDay(planDayId, { hotel: hotel?.id || null });
+        set((s) => ({
+          editableItinerary: s.editableItinerary.map(d =>
+            d.planDayId === planDayId
+              ? { ...d, hotelId: hotel?.id || null, hotelName: hotel?.name || null, hotelStarRating: hotel?.star_rating || null, hotelPricePerNight: hotel?.price_per_night ? Number(hotel.price_per_night) : 0 }
+              : d
+          ),
+        }));
+      },
+
       // Fetch templates for a specific region (used in Replace Template modal)
       fetchCityTemplates: async (regionId) => {
         if (get().cityTemplates[regionId]) return; // already loaded
@@ -394,6 +409,10 @@ function _buildEditableItinerary(plan, startDate) {
       includesNight: d.includes_night || false,
       dayTourId: d.day_tour,
       dayTour: d.day_tour_detail || null,
+      hotelId: d.hotel || null,
+      hotelName: d.hotel_name || null,
+      hotelStarRating: d.hotel_star_rating || null,
+      hotelPricePerNight: d.hotel_price_per_night ? Number(d.hotel_price_per_night) : 0,
     };
   });
 }

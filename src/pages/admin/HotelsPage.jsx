@@ -13,7 +13,7 @@ const DEFAULT_FORM = {
   country: '', region: '', name: '', city: '', star_rating: 3, hotel_type: '',
   address: '', description: '', contact_phone: '', contact_email: '', website: '',
   check_in_time: '', check_out_time: '', latitude: '', longitude: '',
-  price_notes: '', display_order: 0, is_active: true,
+  price_per_night: '', price_notes: '', display_order: 0, is_active: true,
 };
 
 const STAR_OPTIONS = [1, 2, 3, 4, 5].map(n => ({ value: n, label: `${n} Star` }));
@@ -180,6 +180,7 @@ export default function HotelsPage() {
           { label: 'Address', value: viewing.address, type: 'multiline', colSpan: 2 },
           { label: 'Check-in Time', value: viewing.check_in_time },
           { label: 'Check-out Time', value: viewing.check_out_time },
+          { label: 'Price / Night', value: viewing.price_per_night ? `INR ${Number(viewing.price_per_night).toLocaleString()}` : '—' },
           { label: 'Price Notes', value: viewing.price_notes },
           { label: 'Display Order', value: viewing.display_order },
           { label: 'Location', value: viewing.latitude && viewing.longitude ? { lat: viewing.latitude, lng: viewing.longitude } : null, type: 'coords', colSpan: 2 },
@@ -220,8 +221,11 @@ export default function HotelsPage() {
                 <TimePicker label="Check-in" value={form.check_in_time} onChange={val => setForm(f => ({ ...f, check_in_time: val }))} />
                 <TimePicker label="Check-out" value={form.check_out_time} onChange={val => setForm(f => ({ ...f, check_out_time: val }))} />
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <Input label="Price Notes" value={form.price_notes} onChange={e => setForm(f => ({ ...f, price_notes: e.target.value }))} />
+              <div className="grid grid-cols-2 gap-3">
+                <Input label="Price / Night (INR)" type="number" step="0.01" value={form.price_per_night} onChange={e => setForm(f => ({ ...f, price_per_night: e.target.value }))} />
+                <Input label="Price Notes" value={form.price_notes} onChange={e => setForm(f => ({ ...f, price_notes: e.target.value }))} placeholder="e.g. ₹18,000/night" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
                 <Input label="Latitude" type="number" step="any" value={form.latitude} onChange={e => setForm(f => ({ ...f, latitude: e.target.value }))} />
                 <Input label="Longitude" type="number" step="any" value={form.longitude} onChange={e => setForm(f => ({ ...f, longitude: e.target.value }))} />
               </div>

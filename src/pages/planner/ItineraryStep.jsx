@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import usePlannerStore from '../../store/plannerStore';
 import useAuthStore from '../../store/authStore';
+import { hotelsAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 
 /* ── Helper: group consecutive days by region into city blocks ── */
@@ -126,7 +127,7 @@ export default function ItineraryStep() {
     selectedTemplate, buildItinerary, saving,
     draftPlan, editableItinerary,
     fetchCityTemplates, cityTemplates, cityTemplatesLoading,
-    updateDayTemplate, finalizePlan, downloadPdf, refreshDraftPlan,
+    updateDayTemplate, setDayHotel, finalizePlan, downloadPdf, refreshDraftPlan,
   } = store;
 
   const containerRef = useRef(null);
@@ -134,6 +135,12 @@ export default function ItineraryStep() {
   const [swapping, setSwapping] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+
+  // Hotel picker state
+  const [hotelPickerRegion, setHotelPickerRegion] = useState(null); // regionId of open picker
+  const [regionHotels, setRegionHotels] = useState({}); // { regionId: Hotel[] }
+  const [hotelsLoading, setHotelsLoading] = useState({});
+  const [hotelSaving, setHotelSaving] = useState(null); // planDayId being saved
 
   const usingDraft = draftPlan && editableItinerary.length > 0;
   const days = usingDraft ? editableItinerary : itinerary;
@@ -182,6 +189,43 @@ export default function ItineraryStep() {
       toast.success('Generating PDF…');
       window.dispatchEvent(new CustomEvent('download-pdf'));
     }
+  };
+
+  // Hotel picker: toggle open/close and load hotels for a region
+  const toggleHotelPicker = async (regionId) => {
+    if (hotelPickerRegion === regionId) { setHotelPickerRegion(null); return; }
+    setHotelPickerRegion(regionId);
+    if (!regionHotels[regionId]) {
+      setHotelsLoading(p => ({ ...p, [regionId]: true }));
+      try {
+        const { data } = await hotelsAPI.getHotels({ region: regionId, is_active: true, page_size: 50 });
+        setRegionHotels(p => ({ ...p, [regionId]: data.results || data }));
+      } catch { toast.error('Failed to load hotels'); }
+      finally { setHotelsLoading(p => ({ ...p, [regionId]: false })); }
+    }
+  };
+
+  // Assign hotel to all days in a city group
+  const handleSelectHotel = async (group, hotel) => {
+    const idsToUpdate = group.days.filter(d => d.includesNight).map(d => d.planDayId);
+    if (idsToUpdate.length === 0) return;
+    setHotelSaving(group.regionId);
+    try {
+      await Promise.all(idsToUpdate.map(id => setDayHotel(id, hotel)));
+      toast.success(`${hotel.name} assigned for ${group.regionName}`);
+    } catch { toast.error('Failed to assign hotel'); }
+    finally { setHotelSaving(null); }
+  };
+
+  const handleRemoveHotel = async (group) => {
+    const idsToUpdate = group.days.filter(d => d.hotelId).map(d => d.planDayId);
+    if (idsToUpdate.length === 0) return;
+    setHotelSaving(group.regionId);
+    try {
+      await Promise.all(idsToUpdate.map(id => setDayHotel(id, null)));
+      toast.success('Hotel removed');
+    } catch { toast.error('Failed to remove hotel'); }
+    finally { setHotelSaving(null); }
   };
 
   if (days.length === 0) {
@@ -363,6 +407,108 @@ export default function ItineraryStep() {
                       );
                     })}
                   </div>
+
+                  {/* Hotel Section — shown for city groups that have night stays */}
+                  {usingDraft && group.days.some(d => d.includesNight) && (() => {
+                    const assignedHotel = group.days.find(d => d.hotelId);
+                    const isOpen = hotelPickerRegion === group.regionId;
+                    const hotels = regionHotels[group.regionId] || [];
+                    const loading = hotelsLoading[group.regionId];
+                    const saving = hotelSaving === group.regionId;
+
+                    return (
+                      <div className="border-t border-gray-100 dark:border-white/[0.06]">
+                        <div className="px-5 py-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-xl bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 flex items-center justify-center">
+                                <Hotel className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <div className="text-[11px] font-bold text-ink/40 dark:text-white/30 uppercase tracking-wider">Hotel · {nights} {nights === 1 ? 'Night' : 'Nights'}</div>
+                                {assignedHotel ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-sm text-ink dark:text-white">{assignedHotel.hotelName}</span>
+                                    {assignedHotel.hotelStarRating && (
+                                      <span className="text-[10px] text-amber-500">{'★'.repeat(assignedHotel.hotelStarRating)}</span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-xs font-medium text-ink/40 dark:text-white/30">No hotel selected</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {assignedHotel && (
+                                <button onClick={() => handleRemoveHotel(group)} disabled={saving}
+                                  className="text-[10px] font-bold text-red-400 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50">
+                                  Remove
+                                </button>
+                              )}
+                              <button onClick={() => toggleHotelPicker(group.regionId)} disabled={saving}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200/50 dark:border-purple-500/20 text-[11px] font-bold text-purple-600 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-all cursor-pointer disabled:opacity-50">
+                                <Hotel className="w-3 h-3" />
+                                {assignedHotel ? 'Change' : 'Select Hotel'}
+                                {isOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Hotel list dropdown */}
+                          <AnimatePresence>
+                            {isOpen && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="mt-3 space-y-2 max-h-60 overflow-y-auto">
+                                  {loading ? (
+                                    <div className="flex justify-center py-4">
+                                      <Loader2 className="w-5 h-5 animate-spin text-purple-400" />
+                                    </div>
+                                  ) : hotels.length === 0 ? (
+                                    <p className="text-xs text-ink/40 dark:text-white/30 text-center py-4 font-medium">
+                                      No hotels available for {group.regionName}
+                                    </p>
+                                  ) : hotels.map(h => (
+                                    <button key={h.id} onClick={() => handleSelectHotel(group, h)} disabled={saving}
+                                      className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all cursor-pointer border
+                                        ${assignedHotel?.hotelId === h.id
+                                          ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-500/30'
+                                          : 'bg-canvas dark:bg-d-surface border-gray-100 dark:border-white/[0.06] hover:border-purple-200 dark:hover:border-purple-500/20'
+                                        }`}
+                                    >
+                                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0
+                                        ${assignedHotel?.hotelId === h.id ? 'bg-purple-500 text-white' : 'bg-gray-100 dark:bg-white/[0.06] text-ink/30 dark:text-white/30'}`}>
+                                        <Hotel className="w-4 h-4" />
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-bold text-sm text-ink dark:text-white truncate">{h.name}</div>
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                          {h.star_rating && <span className="text-[10px] text-amber-500">{'★'.repeat(h.star_rating)}</span>}
+                                          {h.city && <span className="text-[10px] text-ink/40 dark:text-white/30">{h.city}</span>}
+                                        </div>
+                                      </div>
+                                      {h.price_per_night > 0 && (
+                                        <span className="text-xs font-bold text-purple-600 dark:text-purple-300 shrink-0">₹{Number(h.price_per_night).toLocaleString()}<span className="text-[10px] font-medium text-ink/40 dark:text-white/30">/night</span></span>
+                                      )}
+                                      {assignedHotel?.hotelId === h.id && (
+                                        <div className="w-5 h-5 rounded-full bg-purple-500 text-white flex items-center justify-center shrink-0">
+                                          <Check className="w-3 h-3" strokeWidth={3} />
+                                        </div>
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                 </div>
               </div>
             </motion.div>

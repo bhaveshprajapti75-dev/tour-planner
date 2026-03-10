@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, X, Receipt, MapPin, Route, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, X, Receipt, MapPin, Route, ChevronDown, ChevronUp, Hotel } from 'lucide-react';
 import usePlannerStore from '../../store/plannerStore';
 
 export default function SidebarQuotation() {
@@ -20,10 +20,26 @@ export default function SidebarQuotation() {
         return sum + price;
     }, 0);
 
+    // Calculate hotel total
+    const hotelTotal = days.reduce((sum, day) => sum + (day.hotelPricePerNight || 0), 0);
+    const grandTotal = dayTourTotal + hotelTotal;
+
     // Gather inclusions/exclusions from the draft plan's incl_excl
     const planInclExcl = draftPlan?.incl_excl || [];
     const selectedItems = planInclExcl.filter(ie => ie.type === 'INCLUSION');
     const excludedItems = planInclExcl.filter(ie => ie.type === 'EXCLUSION');
+
+    // Gather hotel assignments grouped by city
+    const hotelsByCity = useMemo(() => {
+        const map = {};
+        for (const day of days) {
+            if (day.hotelName && day.regionName) {
+                if (!map[day.regionName]) map[day.regionName] = { hotelName: day.hotelName, stars: day.hotelStarRating, pricePerNight: day.hotelPricePerNight || 0, nights: 0 };
+                map[day.regionName].nights++;
+            }
+        }
+        return Object.entries(map);
+    }, [days]);
 
     return (
         <div className="bg-white dark:bg-d-card rounded-[2.5rem] shadow-xl shadow-ink/5 dark:shadow-black/20 border border-gray-100 dark:border-white/[0.08] flex flex-col max-h-[calc(100vh-8rem)] overflow-hidden">
@@ -96,11 +112,23 @@ export default function SidebarQuotation() {
                                 </div>
                                 
                                 {/* Total at bottom of day list */}
-                                {dayTourTotal > 0 && (
-                                    <div className="pt-4 mt-3 border-t-2 border-brand/20">
+                                {grandTotal > 0 && (
+                                    <div className="pt-4 mt-3 border-t-2 border-brand/20 space-y-2">
+                                        {dayTourTotal > 0 && hotelTotal > 0 && (
+                                            <>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs font-semibold text-ink/50 dark:text-white/40">Day Tours</span>
+                                                    <span className="text-xs font-bold text-ink dark:text-white">INR {dayTourTotal.toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs font-semibold text-ink/50 dark:text-white/40">Hotels</span>
+                                                    <span className="text-xs font-bold text-ink dark:text-white">INR {hotelTotal.toLocaleString()}</span>
+                                                </div>
+                                            </>
+                                        )}
                                         <div className="flex justify-between items-center">
                                             <span className="text-sm font-bold text-ink dark:text-white uppercase tracking-wide">Total</span>
-                                            <span className="text-2xl font-black text-brand">INR {dayTourTotal.toLocaleString()}</span>
+                                            <span className="text-2xl font-black text-brand">INR {grandTotal.toLocaleString()}</span>
                                         </div>
                                     </div>
                                 )}
@@ -115,6 +143,29 @@ export default function SidebarQuotation() {
                                     </div>
                                 )}
                             </div>
+
+                            {/* Hotels */}
+                            {hotelsByCity.length > 0 && (
+                                <div className="space-y-3 text-sm bg-purple-50/50 dark:bg-purple-950/20 p-5 rounded-3xl border border-purple-100/50 dark:border-purple-500/10">
+                                    <div className="text-xs uppercase tracking-widest font-extrabold text-purple-500/60 dark:text-purple-400/50 flex items-center gap-1.5">
+                                        <Hotel className="w-3.5 h-3.5" /> Hotels
+                                    </div>
+                                    {hotelsByCity.map(([city, info]) => (
+                                        <div key={city} className="flex justify-between items-center py-1">
+                                            <div>
+                                                <span className="font-bold text-ink dark:text-white text-xs">{info.hotelName}</span>
+                                                {info.stars && <span className="text-[10px] text-amber-500 ml-1.5">{'★'.repeat(info.stars)}</span>}
+                                            </div>
+                                            <div className="text-right">
+                                                {info.pricePerNight > 0 && (
+                                                    <div className="text-xs font-bold text-purple-600 dark:text-purple-300">INR {(info.pricePerNight * info.nights).toLocaleString()}</div>
+                                                )}
+                                                <span className="text-[10px] font-bold text-ink/40 dark:text-white/30">{city} · {info.nights}N</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </motion.div>
                     )}
 
