@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, X, Receipt, MapPin, Route } from 'lucide-react';
+import { Check, X, Receipt, MapPin, Route, ChevronDown, ChevronUp } from 'lucide-react';
 import usePlannerStore from '../../store/plannerStore';
 
 export default function SidebarQuotation() {
@@ -8,6 +8,8 @@ export default function SidebarQuotation() {
     const { totalDays, totalNights, travelType, selectedCountry,
         itinerary, editableItinerary, draftPlan } = store;
     const [activeTab, setActiveTab] = useState('summary');
+    const [showAllIncl, setShowAllIncl] = useState(false);
+    const [showAllExcl, setShowAllExcl] = useState(false);
 
     // Use editableItinerary (from draft plan) with fallback to legacy itinerary
     const days = editableItinerary.length > 0 ? editableItinerary : itinerary;
@@ -131,13 +133,18 @@ export default function SidebarQuotation() {
                                     {selectedItems.length === 0 && (
                                         <li className="text-sm text-ink-light dark:text-white/40 font-medium">No inclusions selected</li>
                                     )}
-                                    {selectedItems.map(item => (
+                                    {(showAllIncl ? selectedItems : selectedItems.slice(0, 3)).map(item => (
                                         <li key={item.id} className="flex items-start gap-3 text-sm text-ink-light">
                                             <div className="w-5 h-5 rounded-full bg-brand/10 text-brand flex items-center justify-center shrink-0 mt-0.5"><Check className="w-3 h-3" strokeWidth={3} /></div>
                                             <span className="font-medium">{item.item_text}</span>
                                         </li>
                                     ))}
                                 </ul>
+                                {selectedItems.length > 3 && (
+                                    <button onClick={() => setShowAllIncl(!showAllIncl)} className="mt-3 flex items-center gap-1 text-xs font-semibold text-brand hover:text-brand/80 transition-colors">
+                                        {showAllIncl ? <><ChevronUp className="w-3.5 h-3.5" /> Show less</> : <><ChevronDown className="w-3.5 h-3.5" /> +{selectedItems.length - 3} more</>}
+                                    </button>
+                                )}
                             </div>
 
                             {/* Exclusions */}
@@ -147,13 +154,18 @@ export default function SidebarQuotation() {
                                     {excludedItems.length === 0 && (
                                         <li className="text-sm text-ink-light dark:text-white/40 font-medium">No exclusions selected</li>
                                     )}
-                                    {excludedItems.map(item => (
+                                    {(showAllExcl ? excludedItems : excludedItems.slice(0, 3)).map(item => (
                                         <li key={item.id} className="flex items-start gap-3 text-sm text-ink-light">
                                             <div className="w-5 h-5 rounded-full bg-red-100 text-red-500 flex items-center justify-center shrink-0 mt-0.5"><X className="w-3 h-3" strokeWidth={3} /></div>
                                             <span className="font-medium">{item.item_text}</span>
                                         </li>
                                     ))}
                                 </ul>
+                                {excludedItems.length > 3 && (
+                                    <button onClick={() => setShowAllExcl(!showAllExcl)} className="mt-3 flex items-center gap-1 text-xs font-semibold text-red-500 hover:text-red-400 transition-colors">
+                                        {showAllExcl ? <><ChevronUp className="w-3.5 h-3.5" /> Show less</> : <><ChevronDown className="w-3.5 h-3.5" /> +{excludedItems.length - 3} more</>}
+                                    </button>
+                                )}
                             </div>
                         </motion.div>
                     )}

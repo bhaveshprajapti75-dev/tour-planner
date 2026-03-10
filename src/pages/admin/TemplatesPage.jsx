@@ -218,18 +218,23 @@ export default function TemplatesPage() {
     try {
       let templateId;
       if (crud.editing) {
-        await templatesAPI.updateTemplate(crud.editing, payload);
-        templateId = crud.editing;
+        await templatesAPI.updateTemplate(crud.editing.id, payload);
+        templateId = crud.editing.id;
       } else {
         const { data } = await templatesAPI.createTemplate(payload);
         templateId = data.id;
       }
       // Save/update the single day (day_number=1) — uses addDay action which upserts
       if (form.day_tour) {
-        await templatesAPI.addDay(templateId, {
-          day_number: 1,
-          day_tour: Number(form.day_tour),
-        });
+        try {
+          await templatesAPI.addDay(templateId, {
+            day_number: 1,
+            day_tour: Number(form.day_tour),
+          });
+        } catch {
+          // Day tour attachment failed but template itself was saved
+          toast.error('Template saved but day tour could not be attached');
+        }
       }
       toast.success(crud.editing ? 'Template updated' : 'Template created');
       clearErrors();
