@@ -66,6 +66,7 @@ export default function RegionsPage() {
   const rules = {
     country: v => !v && 'Please select a country',
     name: v => !v?.trim() && 'Region name is required',
+    code: v => !v?.trim() && 'Code is required',
   };
 
   const onSubmit = e => {
@@ -133,7 +134,7 @@ export default function RegionsPage() {
             options={countryOpts} placeholder="Select Country" searchable error={errors.country} />
           <div className="grid grid-cols-2 gap-4">
             <Input label="Name" value={crud.form.name} onChange={e => { crud.setForm(f => ({ ...f, name: e.target.value })); clearError('name'); }} required error={errors.name} />
-            <Input label="Code" value={crud.form.code} onChange={e => crud.setForm(f => ({ ...f, code: e.target.value }))} />
+            <Input label="Code" value={crud.form.code} onChange={e => { crud.setForm(f => ({ ...f, code: e.target.value })); clearError('code'); }} required error={errors.code} />
           </div>
           <Textarea label="Description" value={crud.form.description} onChange={e => crud.setForm(f => ({ ...f, description: e.target.value }))} rows={2} />
           <Input label="Display Order" type="number" value={crud.form.display_order} onChange={e => crud.setForm(f => ({ ...f, display_order: parseInt(e.target.value) || 0 }))} />

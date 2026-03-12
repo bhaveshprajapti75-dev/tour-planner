@@ -231,9 +231,12 @@ export default function TemplatesPage() {
             day_number: 1,
             day_tour: Number(form.day_tour),
           });
-        } catch {
-          // Day tour attachment failed but template itself was saved
-          toast.error('Template saved but day tour could not be attached');
+        } catch (dayErr) {
+          const errData = dayErr.response?.data;
+          const msg = errData && typeof errData === 'object'
+            ? Object.values(errData).flat().join(', ')
+            : 'Template saved but day tour could not be attached';
+          toast.error(msg);
         }
       }
       toast.success(crud.editing ? 'Template updated' : 'Template created');

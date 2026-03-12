@@ -589,8 +589,7 @@ export function MultiSelect({
         </label>
       )}
 
-      <button
-        type="button"
+      <div
         ref={triggerRef}
         onClick={handleToggle}
         className={`w-full flex items-center justify-between min-h-[46px] px-2 py-1.5 bg-canvas dark:bg-d-surface border rounded-xl transition-all cursor-pointer text-left
@@ -624,7 +623,7 @@ export function MultiSelect({
           )}
         </div>
         <ChevronDown className={`absolute right-4 w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
+      </div>
 
       {open && (
         <div className={`absolute z-50 w-full bg-white dark:bg-d-card border border-gray-200 dark:border-white/[0.08] rounded-xl shadow-xl shadow-black/10 dark:shadow-black/30 overflow-hidden animate-in fade-in duration-150 ${openUp ? 'bottom-full mb-1.5 slide-in-from-bottom-1' : 'mt-1.5 slide-in-from-top-1'
