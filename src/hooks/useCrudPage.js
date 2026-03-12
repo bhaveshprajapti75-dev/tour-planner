@@ -199,6 +199,14 @@ export default function useCrudPage({
     if (confirmId) handleDelete(confirmId);
   }, [confirmId, handleDelete]);
 
+  // Expose a reload that is guaranteed to fetch fresh data
+  // even if the useEffect cleanup invalidated the current fetchId.
+  const reload = useCallback(async () => {
+    // Reset the fetchId so the cleanup guard doesn't discard our result
+    fetchIdRef.current = 0;
+    return load();
+  }, [load]);
+
   return {
     // Data
     data,
@@ -246,6 +254,6 @@ export default function useCrudPage({
     },
 
     // Utilities
-    reload: load,
+    reload,
   };
 }

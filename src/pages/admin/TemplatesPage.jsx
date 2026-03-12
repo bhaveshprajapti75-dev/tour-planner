@@ -242,7 +242,7 @@ export default function TemplatesPage() {
       toast.success(crud.editing ? 'Template updated' : 'Template created');
       clearErrors();
       crud.closeModal();
-      crud.reload();
+      await crud.reload();
     } catch (err) {
       const data = err.response?.data;
       if (data && typeof data === 'object') {
