@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ListChecks, Tag } from 'lucide-react';
+import { Upload, Loader2 } from 'lucide-react';
 import { inclusionsAPI, geographyAPI } from '../../services/api';
 import useCrudPage from '../../hooks/useCrudPage';
 import useFormValidation from '../../hooks/useFormValidation';
@@ -16,6 +17,8 @@ const ITEM_FORM = { country: '', unique_code: '', category: '', item_service: ''
 function ItemsView({ categories, countries }) {
   const [filterType, setFilterType] = useState('');
   const [viewing, setViewing] = useState(null);
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const { errors, validate, clearError, clearErrors } = useFormValidation();
   const catOpts = useMemo(() => categories.map(c => ({ value: c.id, label: c.name })), [categories]);
   const countryOpts = useMemo(() => countries.map(c => ({ value: c.id, label: c.name })), [countries]);
@@ -65,6 +68,26 @@ function ItemsView({ categories, countries }) {
   const closeModal = () => { clearErrors(); crud.closeModal(); };
   const { form, setForm } = crud;
 
+  const handleBulkUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      setUploading(true);
+      const { data } = await inclusionsAPI.bulkUploadItems(formData);
+      toast.success(`Uploaded! Created: ${data.created ?? 0}, Skipped: ${data.skipped ?? 0}`);
+      if (data.errors?.length) toast.error(`Warnings: ${data.errors[0]}`, { duration: 6000 });
+      setShowUpload(false);
+      crud.reload();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Upload failed');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -74,6 +97,12 @@ function ItemsView({ categories, countries }) {
         searchPlaceholder="Search items..."
         onAdd={crud.openCreate}
         addLabel="Add Item"
+        extraActions={
+          <button onClick={() => setShowUpload(true)}
+            className="flex items-center gap-2 text-sm font-bold bg-white dark:bg-d-card text-ink dark:text-white px-5 py-2.5 rounded-2xl border border-gray-200 dark:border-white/[0.08] hover:border-brand transition-all shadow-sm cursor-pointer">
+            <Upload className="w-4 h-4" /> Bulk Upload
+          </button>
+        }
         filters={
           <FilterDropdown
             value={filterType}
@@ -132,6 +161,31 @@ function ItemsView({ categories, countries }) {
           <ToggleSwitch label="Active" checked={form.is_active} onChange={val => setForm(f => ({ ...f, is_active: val }))} />
           <ModalActions onCancel={closeModal} saving={crud.saving} isEdit={!!crud.editing} />
         </form>
+      </Modal>
+
+      {/* Bulk Upload Modal */}
+      <Modal open={showUpload} onClose={() => setShowUpload(false)} title="Bulk Upload Inclusions/Exclusions" maxWidth="max-w-md">
+        <div className="space-y-4">
+          <p className="text-sm text-ink-light dark:text-white/50">
+            Upload a CSV or Excel file with columns:{' '}
+            <span className="font-mono text-xs bg-canvas dark:bg-d-surface px-2 py-0.5 rounded">country_code, unique_code, type, category, item_service, details_notes, source_files, display_order</span>
+          </p>
+          <p className="text-xs text-ink-light dark:text-white/50">
+            <strong>type</strong> must be <code>INCLUSION</code> or <code>EXCLUSION</code>. Categories are auto-created if they don&#39;t exist.
+          </p>
+          <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 dark:border-white/[0.12] rounded-2xl p-8 cursor-pointer hover:border-brand transition-colors">
+            <Upload className="w-8 h-8 text-ink-light dark:text-white/50 mb-3" />
+            <span className="text-sm font-bold text-ink dark:text-white">Click to select file</span>
+            <span className="text-xs text-ink-light dark:text-white/50 mt-1">.xlsx, .csv</span>
+            <input type="file" accept=".xlsx,.csv" onChange={handleBulkUpload} className="hidden" disabled={uploading} />
+          </label>
+          {uploading && (
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 className="w-5 h-5 text-brand animate-spin" />
+              <span className="text-sm font-medium text-ink dark:text-white">Uploading...</span>
+            </div>
+          )}
+        </div>
       </Modal>
     </>
   );

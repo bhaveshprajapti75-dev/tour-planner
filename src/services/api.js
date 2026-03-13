@@ -134,6 +134,7 @@ export const inclusionsAPI = {
   createItem: (data) => api.post('/inclusions/exclusions/', data),
   updateItem: (id, data) => api.patch(`/inclusions/exclusions/${id}/`, data),
   deleteItem: (id) => api.delete(`/inclusions/exclusions/${id}/`),
+  bulkUploadItems: (formData) => api.post('/inclusions/exclusions/bulk-upload/', formData),
 };
 
 // ==================== ITINERARY TEMPLATES ====================
