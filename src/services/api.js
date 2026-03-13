@@ -55,6 +55,9 @@ export const geographyAPI = {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
   deleteCountry: (id) => api.delete(`/geography/countries/${id}/`),
+  bulkUploadCountries: (formData) => api.post('/geography/countries/bulk-upload/', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
 
   // Regions
   getRegions: (params) => api.get('/geography/regions/', { params }),
@@ -66,6 +69,9 @@ export const geographyAPI = {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
   deleteRegion: (id) => api.delete(`/geography/regions/${id}/`),
+  bulkUploadRegions: (formData) => api.post('/geography/regions/bulk-upload/', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
 };
 
 // ==================== ATTRACTIONS ====================
@@ -93,6 +99,9 @@ export const dayToursAPI = {
   deleteDayTour: (id) => api.delete(`/day-tours/day/${id}/`),
   addAttractions: (id, data) => api.post(`/day-tours/day/${id}/add_attractions/`, data),
   removeAttraction: (data) => api.post('/day-tours/day/remove_attraction/', data),
+  bulkUpload: (formData) => api.post('/day-tours/day/bulk-upload/', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
 };
 
 // ==================== HOTELS ====================
@@ -106,6 +115,9 @@ export const hotelsAPI = {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
   deleteHotel: (id) => api.delete(`/hotel/hotels/${id}/`),
+  bulkUpload: (formData) => api.post('/hotel/hotels/bulk-upload/', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
 };
 
 // ==================== INCLUSIONS ====================

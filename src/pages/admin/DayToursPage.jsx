@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { Upload, Loader2 } from 'lucide-react';
 import { dayToursAPI, geographyAPI, attractionsAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import useCrudPage from '../../hooks/useCrudPage';
@@ -22,6 +23,8 @@ const CURRENCY_OPTIONS = [
   { value: 'INR', label: 'INR — Indian Rupee' },
   { value: 'USD', label: 'USD — US Dollar' },
   { value: 'EUR', label: 'EUR — Euro' },
+  { value: 'ISK', label: 'ISK — Icelandic Króna' },
+  { value: 'CHF', label: 'CHF — Swiss Franc' },
 ];
 
 const DEFAULT_FORM = {
@@ -38,6 +41,8 @@ export default function DayToursPage() {
   const [viewing, setViewing] = useState(null);
   const [regionAttractions, setRegionAttractions] = useState([]);
   const [selectedAttractions, setSelectedAttractions] = useState([]);
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const { errors, validate, clearError, clearErrors } = useFormValidation();
 
   const rules = {
@@ -139,6 +144,26 @@ export default function DayToursPage() {
   };
 
   const closeModal = () => { clearErrors(); setSelectedAttractions([]); crud.closeModal(); };
+
+  const handleBulkUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      setUploading(true);
+      const { data } = await dayToursAPI.bulkUpload(formData);
+      toast.success(`Uploaded! Created: ${data.created ?? 0}, Skipped: ${data.skipped ?? 0}`);
+      if (data.errors?.length) toast.error(`Warnings: ${data.errors[0]}`, { duration: 6000 });
+      setShowUpload(false);
+      crud.reload();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Upload failed');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
   const { form, setForm } = crud;
 
   // Intercept openEdit to load existing attractions
@@ -186,6 +211,12 @@ export default function DayToursPage() {
         searchPlaceholder="Search day tours..."
         onAdd={crud.openCreate}
         addLabel="Add Day Tour"
+        extraActions={
+          <button onClick={() => setShowUpload(true)}
+            className="flex items-center gap-2 text-sm font-bold bg-white dark:bg-d-card text-ink dark:text-white px-5 py-2.5 rounded-2xl border border-gray-200 dark:border-white/[0.08] hover:border-brand transition-all shadow-sm cursor-pointer">
+            <Upload className="w-4 h-4" /> Bulk Upload
+          </button>
+        }
         filters={
           <FilterDropdown
             value={filterRegion}
@@ -283,6 +314,28 @@ export default function DayToursPage() {
 
           <ToggleSwitch label="Active" checked={form.is_active} onChange={val => setForm(f => ({ ...f, is_active: val }))} />
 
+        </div>
+      </Modal>
+
+      {/* Bulk Upload Modal */}
+      <Modal open={showUpload} onClose={() => setShowUpload(false)} title="Bulk Upload Day Tours" maxWidth="max-w-md">
+        <div className="space-y-4">
+          <p className="text-sm text-ink-light dark:text-white/50">
+            Upload a CSV or Excel file with columns:{' '}
+            <span className="font-mono text-xs bg-canvas dark:bg-d-surface px-2 py-0.5 rounded">region, activity_combination, itinerary_text, validity_mode, price, currency</span>
+          </p>
+          <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 dark:border-white/[0.12] rounded-2xl p-8 cursor-pointer hover:border-brand transition-colors">
+            <Upload className="w-8 h-8 text-ink-light dark:text-white/50 mb-3" />
+            <span className="text-sm font-bold text-ink dark:text-white">Click to select file</span>
+            <span className="text-xs text-ink-light dark:text-white/50 mt-1">.xlsx, .csv</span>
+            <input type="file" accept=".xlsx,.csv" onChange={handleBulkUpload} className="hidden" disabled={uploading} />
+          </label>
+          {uploading && (
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 className="w-5 h-5 text-brand animate-spin" />
+              <span className="text-sm font-medium text-ink dark:text-white">Uploading...</span>
+            </div>
+          )}
         </div>
       </Modal>
     </div>

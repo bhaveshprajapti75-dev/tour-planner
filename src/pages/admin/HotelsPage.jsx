@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Hotel } from 'lucide-react';
+import { Hotel, Upload, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { hotelsAPI, geographyAPI } from '../../services/api';
 import useCrudPage from '../../hooks/useCrudPage';
 import useFormValidation from '../../hooks/useFormValidation';
@@ -13,10 +14,18 @@ const DEFAULT_FORM = {
   country: '', region: '', name: '', city: '', star_rating: 3, hotel_type: '',
   address: '', description: '', contact_phone: '', contact_email: '', website: '',
   check_in_time: '', check_out_time: '', latitude: '', longitude: '',
-  price_per_night: '', price_notes: '', display_order: 0, is_active: true,
+  price_per_night: '', price_currency: 'INR', price_notes: '', display_order: 0, is_active: true,
 };
 
 const STAR_OPTIONS = [1, 2, 3, 4, 5].map(n => ({ value: n, label: `${n} Star` }));
+
+const CURRENCY_OPTIONS = [
+  { value: 'INR', label: 'INR — Indian Rupee' },
+  { value: 'USD', label: 'USD — US Dollar' },
+  { value: 'EUR', label: 'EUR — Euro' },
+  { value: 'ISK', label: 'ISK — Icelandic Króna' },
+  { value: 'CHF', label: 'CHF — Swiss Franc' },
+];
 
 export default function HotelsPage() {
   const [countries, setCountries] = useState([]);
@@ -26,6 +35,8 @@ export default function HotelsPage() {
   const [viewing, setViewing] = useState(null);
   const [imageFiles, setImageFiles] = useState([]);
   const [removedImageIds, setRemovedImageIds] = useState([]);
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const { errors, validate, clearError, clearErrors } = useFormValidation();
 
   const rules = {
@@ -126,6 +137,26 @@ export default function HotelsPage() {
   const handleOpenCreate = () => { setImageFiles([]); setRemovedImageIds([]); crud.openCreate(); };
   const handleOpenEdit = (row) => { setImageFiles([]); setRemovedImageIds([]); crud.openEdit(row); };
   const closeModal = () => { clearErrors(); setImageFiles([]); setRemovedImageIds([]); crud.closeModal(); };
+
+  const handleBulkUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      setUploading(true);
+      const { data } = await hotelsAPI.bulkUpload(formData);
+      toast.success(`Uploaded! Created: ${data.created ?? 0}, Skipped: ${data.skipped ?? 0}`);
+      if (data.errors?.length) toast.error(`Warnings: ${data.errors[0]}`, { duration: 6000 });
+      setShowUpload(false);
+      crud.reload();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Upload failed');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
   const { form, setForm } = crud;
 
   return (
@@ -137,6 +168,12 @@ export default function HotelsPage() {
         searchPlaceholder="Search hotels..."
         onAdd={handleOpenCreate}
         addLabel="Add Hotel"
+        extraActions={
+          <button onClick={() => setShowUpload(true)}
+            className="flex items-center gap-2 text-sm font-bold bg-white dark:bg-d-card text-ink dark:text-white px-5 py-2.5 rounded-2xl border border-gray-200 dark:border-white/[0.08] hover:border-brand transition-all shadow-sm cursor-pointer">
+            <Upload className="w-4 h-4" /> Bulk Upload
+          </button>
+        }
         filters={
           <FilterDropdown
             value={filterRegion}
@@ -180,7 +217,7 @@ export default function HotelsPage() {
           { label: 'Address', value: viewing.address, type: 'multiline', colSpan: 2 },
           { label: 'Check-in Time', value: viewing.check_in_time },
           { label: 'Check-out Time', value: viewing.check_out_time },
-          { label: 'Price / Night', value: viewing.price_per_night ? `INR ${Number(viewing.price_per_night).toLocaleString()}` : '—' },
+          { label: 'Price / Night', value: viewing.price_per_night ? `${viewing.price_currency || 'INR'} ${Number(viewing.price_per_night).toLocaleString()}` : '—' },
           { label: 'Price Notes', value: viewing.price_notes },
           { label: 'Display Order', value: viewing.display_order },
           { label: 'Location', value: viewing.latitude && viewing.longitude ? { lat: viewing.latitude, lng: viewing.longitude } : null, type: 'coords', colSpan: 2 },
@@ -221,9 +258,10 @@ export default function HotelsPage() {
                 <TimePicker label="Check-in" value={form.check_in_time} onChange={val => setForm(f => ({ ...f, check_in_time: val }))} />
                 <TimePicker label="Check-out" value={form.check_out_time} onChange={val => setForm(f => ({ ...f, check_out_time: val }))} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <Input label="Price / Night (INR)" type="number" step="0.01" value={form.price_per_night} onChange={e => setForm(f => ({ ...f, price_per_night: e.target.value }))} />
-                <Input label="Price Notes" value={form.price_notes} onChange={e => setForm(f => ({ ...f, price_notes: e.target.value }))} placeholder="e.g. ₹18,000/night" />
+              <div className="grid grid-cols-3 gap-3">
+                <Input label="Price / Night" type="number" step="0.01" value={form.price_per_night} onChange={e => setForm(f => ({ ...f, price_per_night: e.target.value }))} />
+                <Select label="Currency" value={form.price_currency} onChange={val => setForm(f => ({ ...f, price_currency: val }))} options={CURRENCY_OPTIONS} />
+                <Input label="Price Notes" value={form.price_notes} onChange={e => setForm(f => ({ ...f, price_notes: e.target.value }))} placeholder="e.g. From CHF 450/night" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Input label="Latitude" type="number" step="any" value={form.latitude} onChange={e => setForm(f => ({ ...f, latitude: e.target.value }))} />
@@ -247,6 +285,28 @@ export default function HotelsPage() {
 
           <ModalActions onCancel={closeModal} saving={crud.saving} isEdit={!!crud.editing} />
         </form>
+      </Modal>
+
+      {/* Bulk Upload Modal */}
+      <Modal open={showUpload} onClose={() => setShowUpload(false)} title="Bulk Upload Hotels" maxWidth="max-w-md">
+        <div className="space-y-4">
+          <p className="text-sm text-ink-light dark:text-white/50">
+            Upload a CSV or Excel file with columns:{' '}
+            <span className="font-mono text-xs bg-canvas dark:bg-d-surface px-2 py-0.5 rounded">country_code, region, name, city, star_rating, check_in_time, check_out_time, latitude, longitude</span>
+          </p>
+          <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 dark:border-white/[0.12] rounded-2xl p-8 cursor-pointer hover:border-brand transition-colors">
+            <Upload className="w-8 h-8 text-ink-light dark:text-white/50 mb-3" />
+            <span className="text-sm font-bold text-ink dark:text-white">Click to select file</span>
+            <span className="text-xs text-ink-light dark:text-white/50 mt-1">.xlsx, .csv</span>
+            <input type="file" accept=".xlsx,.csv" onChange={handleBulkUpload} className="hidden" disabled={uploading} />
+          </label>
+          {uploading && (
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 className="w-5 h-5 text-brand animate-spin" />
+              <span className="text-sm font-medium text-ink dark:text-white">Uploading...</span>
+            </div>
+          )}
+        </div>
       </Modal>
     </div>
   );
